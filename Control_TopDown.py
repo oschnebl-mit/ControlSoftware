@@ -1,4 +1,4 @@
-import sys,qdarkstyle
+import sys,qdarkstyle,pyvisa
 from time import time
 from PyQt5 import QtGui,QtCore
 import PyQt5.QtWidgets as qw 
@@ -6,16 +6,17 @@ import pyqtgraph as pg
 import numpy as np
 
 from Control_Parameters import BrooksParamTree
+from Brooks0254_BuildUp import Brooks0254, MassFlowController
 
 # from TubeFurnaceFillGui import TubeFillWindow
 
 class MainControlWindow(qw.QMainWindow):
-    def __init__(self):
+    def __init__(self, pyvisaConnection):
         super().__init__()
         self.setWindowTitle('Control Panel')
 
         self.resize(1280, 720)  # Non- maximized size
-        self.showMaximized()
+        # self.showMaximized()
         
         ## Create an empty box to hold all the following widgets
         self.mainbox = qw.QWidget()
@@ -99,13 +100,27 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.rxnVac_plot,2,2,1,1)
 
         self.tree = BrooksParamTree()
-        layout.addWidget(self.tree,0,1,1,1)
+        self.mfcButton = qw.QPushButton("Re-initialize MFCs")
+        self.treeGroup = qw.QVBoxLayout()
+        self.treeGroup.addWidget(self.mfcButton)
+        self.treeGroup.addWidget(self.tree)
+        
+        layout.addLayout(self.treeGroup,0,1,1,1)
+        self.mfcButton.clicked.connect(self.setupMFCs)
+
+        self.brooks0254 = Brooks0254(pyvisaConnection, deviceAddress='29751')
 
         self.show()
 
     def abort_process(self):
         ## in practice would set flows to zero
         self.timer.stop()
+
+    def setupMFCs(self):
+        gf1 = self.tree.getParamValue('MFC 1 Setup Parameters','Gas Factor')
+        gf2 = self.tree.getParamValue('MFC 2 Setup Parameters','Gas Factor')
+        gf3 = self.tree.getParamValue('MFC 3 Setup Parameters','Gas Factor')
+        self.brooks0254.setupMFCs([gf1,gf2,gf3])
 
     def run_purge_process(self):
         self.currentProcessPlot.clear()
@@ -208,7 +223,10 @@ class MainControlWindow(qw.QMainWindow):
         # self.new_window.show()
 
 if __name__ == "__main__":
+    rm = pyvisa.ResourceManager()
+    brooks = rm.open_resource('ASRL4::INSTR',read_termination='\r',write_termination='\r')
+
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
-    window = MainControlWindow()
+    window = MainControlWindow(brooks)
     sys.exit(app.exec())

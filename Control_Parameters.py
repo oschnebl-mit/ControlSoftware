@@ -40,3 +40,7 @@ class BrooksParamTree(ParameterTree):
     
     def emitChange(self,param,changes):
         self.paramChange.emit(param,changes)
+
+    def getParamValue(self,branch,child):
+        print(self.p.param('MFC Setup Parameters','MFC 3 Setup Parameters','Gas Factor').value())
+        return self.p.param('MFC Setup Parameters',branch,child).value()
