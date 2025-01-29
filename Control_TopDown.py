@@ -3,6 +3,7 @@ from time import time
 from PyQt5 import QtGui,QtCore
 import PyQt5.QtWidgets as qw 
 import pyqtgraph as pg
+import numpy as np
 
 from TubeFurnaceFillGui import TubeFillWindow
 
@@ -24,9 +25,14 @@ class MainControlWindow(qw.QMainWindow):
         self.highVac_plot = pg.PlotWidget()
         self.rxnVac_plot = pg.PlotWidget()
 
-        self.temp_plot.setLabel('right',"Temperature",units="K")
-        self.highVac_plot.setLabel('right',"High Vac Pressure",units = "Torr")
-        self.rxnVac_plot.setLabel('right',"Process Pressure",units = "Torr")
+        # font=QtGui.QFont()
+        # font.setPixelSize(45)
+        # for plt in [self.temp_plot,self.highVac_plot,self.rxnVac_plot]:
+        #     plt.getAxis("left").tickFont = font
+
+        self.temp_plot.setLabel('left',"Temperature",units="K",color='#ba4a00',**{'font-size': '14pt'})
+        self.highVac_plot.setLabel('left',"High Vac Pressure",units = "Torr",color='#2e86c1',**{'font-size': '14pt'})
+        self.rxnVac_plot.setLabel('left',"Process Pressure",units = "Torr",color='#d4ac0d',**{'font-size': '14pt'})
 
         self.highVac_plot.setXLink(self.temp_plot)
         self.rxnVac_plot.setXLink(self.temp_plot)
@@ -35,7 +41,7 @@ class MainControlWindow(qw.QMainWindow):
         self.cp2 = None
 
         self.purgeButton = qw.QPushButton("Fill with Ar")
-        self.stopButton = qw.QPushButton("Stop")
+        self.stopButton = qw.QPushButton("Stop All")
         self.purgePressureInput = qw.QLineEdit()
         self.purgePressureInput.setText('700')
         self.purgePressureInput.setValidator(QtGui.QIntValidator())
@@ -50,6 +56,37 @@ class MainControlWindow(qw.QMainWindow):
         self.purgeGroup.addLayout(self.buttonGroup)
         self.purgeGroup.addWidget(self.ppiLabel)
         self.purgeGroup.addWidget(self.purgePressureInput)
+
+        self.doseButtonGroup = qw.QHBoxLayout()
+        self.doseH2SButton = qw.QPushButton("Dose with H2S")
+        self.doseH2Button = qw.QPushButton("Dose with H2")
+        self.doseButtonGroup.addWidget(self.doseH2SButton)
+        self.doseButtonGroup.addWidget(self.doseH2Button)
+        self.purgeGroup.addLayout(self.doseButtonGroup)
+
+        self.doseH2SInput = qw.QLineEdit()
+        self.doseH2SInput.setText('10')
+        self.doseH2SInput.setValidator(QtGui.QIntValidator())
+        self.doseH2SLabel = qw.QLabel('H2S Dose Volume:')
+
+        self.doseH2Input = qw.QLineEdit()
+        self.doseH2Input.setText('10')
+        self.doseH2Input.setValidator(QtGui.QIntValidator())
+        self.doseH2Label = qw.QLabel('H2 Dose Volume:')
+
+        self.doseLabelGroup = qw.QHBoxLayout()
+        self.doseLabelGroup.addWidget(self.doseH2Label)
+        self.doseLabelGroup.addWidget(self.doseH2SLabel)
+
+        self.doseInputGroup = qw.QHBoxLayout()
+        self.doseInputGroup.addWidget(self.doseH2Input)
+        self.doseInputGroup.addWidget(self.doseH2SInput)
+
+        self.purgeGroup.addLayout(self.doseLabelGroup)
+        self.purgeGroup.addLayout(self.doseInputGroup)
+
+        self.doseH2SButton.clicked.connect(self.plotDosing)
+        
 
         ## Add widgets to layout grid w/ row, col, rowspan, colspan
         layout.addLayout(self.purgeGroup,0,0,1,1)
@@ -70,7 +107,7 @@ class MainControlWindow(qw.QMainWindow):
         if self.cp2 is not None:
             self.cp2.clear()
         
-        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr')
+        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#3f51b5',**{'font-size': '14pt'})
         
         ### for second trace #######
         self.cp2 = pg.ViewBox()
@@ -78,14 +115,14 @@ class MainControlWindow(qw.QMainWindow):
         self.currentProcessPlot.scene().addItem(self.cp2)
         self.currentProcessPlot.getAxis('right').linkToView(self.cp2)
         self.cp2.setXLink(self.currentProcessPlot)
-        self.currentProcessPlot.setLabel('right',"Ar Flow",units='sccm')
+        self.currentProcessPlot.setLabel('right',"Ar Flow",units='sccm',color='#52be80',**{'font-size':'14pt'})
 
         self.updateViews()
         self.currentProcessPlot.getViewBox().sigResized.connect(self.updateViews)
         #################
 
-        self.tube_pressure_trace = self.currentProcessPlot.plot(pen='y')
-        self.sccm_Ar_trace = pg.PlotCurveItem(pen='r')
+        self.tube_pressure_trace = self.currentProcessPlot.plot(pen='#3f51b5')
+        self.sccm_Ar_trace = pg.PlotCurveItem(pen='#52be80')
         self.cp2.addItem(self.sccm_Ar_trace)
 
 
@@ -121,8 +158,46 @@ class MainControlWindow(qw.QMainWindow):
         self.tube_pressure_trace.setData(self.time_data, self.tube_pressure_data)
         self.sccm_Ar_trace.setData(self.time_data,self.sccm_Ar_data)
 
+    def plotDosing(self):
+        # m_h2s = 34.076 #amu
+        m_h2s = 5.657e-26 # kg
+        Ah2s = 4.43681	
+        Bh2s = 829.439	
+        Ch2s = -25.412
+
+        def Antoine(A,B,C,T):
+            log10P = A - (B / (T + C))
+            return 10**log10P
+
+        self.currentProcessPlot.clear()
+        if self.cp2 is not None:
+            self.cp2.clear()
+        
+        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#3f51b5',**{'font-size': '14pt'})
+        self.currentProcessPlot.setLabel('bottom',"Temperature",units='K',**{'font-size':'14pt'})
+        Trange = np.linspace(180,212)
+        self.calcVaporPressure = Antoine(Ah2s,Bh2s,Ch2s,Trange)
+        self.calcVaporPressureTrace = self.currentProcessPlot.plot(Trange,self.calcVaporPressure,pen='#3f51b5')
+        self.actualPressureTrace = pg.PlotCurveItem(pen='#52be80',symbol='o')
+        self.currentProcessPlot.addItem(self.actualPressureTrace)
+        
+        self.tcurr = 0
+        self.actualTemp = 195
+        self.actualVaporPressure = 1
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.update_plot_dosing)
+        self.timer.start(1000)
+
+    def update_plot_dosing(self):
+        while self.tcurr <=10:
+            self.actualVaporPressure += 10
+            self.actualPressureTrace.setData(self.actualTemp,self.actualVaporPressure)
+            tcurr += 1
+        self.timer.stop()
+
 
     def launch_tube_fill_window(self):
+        '''Not using for now'''
         self.new_window = TubeFillWindow()
         self.new_window.show()
 
