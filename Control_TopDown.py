@@ -5,7 +5,9 @@ import PyQt5.QtWidgets as qw
 import pyqtgraph as pg
 import numpy as np
 
-from TubeFurnaceFillGui import TubeFillWindow
+from Control_Parameters import BrooksParamTree
+
+# from TubeFurnaceFillGui import TubeFillWindow
 
 class MainControlWindow(qw.QMainWindow):
     def __init__(self):
@@ -90,11 +92,14 @@ class MainControlWindow(qw.QMainWindow):
 
         ## Add widgets to layout grid w/ row, col, rowspan, colspan
         layout.addLayout(self.purgeGroup,0,0,1,1)
-        layout.addWidget(self.currentProcessPlot,1,0,2,1)
+        layout.addWidget(self.currentProcessPlot,1,0,2,2)
 
         layout.addWidget(self.temp_plot,0,2,1,1)
         layout.addWidget(self.highVac_plot,1,2,1,1)
         layout.addWidget(self.rxnVac_plot,2,2,1,1)
+
+        self.tree = BrooksParamTree()
+        layout.addWidget(self.tree,0,1,1,1)
 
         self.show()
 
@@ -174,32 +179,33 @@ class MainControlWindow(qw.QMainWindow):
             self.cp2.clear()
         
         self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#3f51b5',**{'font-size': '14pt'})
-        self.currentProcessPlot.setLabel('bottom',"Temperature",units='K',**{'font-size':'14pt'})
+        self.currentProcessPlot.setLabel('bottom',"Temperature",units='K',color='#3f51b5',**{'font-size': '14pt'})
         Trange = np.linspace(180,212)
         self.calcVaporPressure = Antoine(Ah2s,Bh2s,Ch2s,Trange)
         self.calcVaporPressureTrace = self.currentProcessPlot.plot(Trange,self.calcVaporPressure,pen='#3f51b5')
-        self.actualPressureTrace = pg.PlotCurveItem(pen='#52be80',symbol='o')
+        self.actualPressureTrace = pg.ScatterPlotItem(pen='#52be80',symbol='o')
         self.currentProcessPlot.addItem(self.actualPressureTrace)
         
         self.tcurr = 0
-        self.actualTemp = 195
-        self.actualVaporPressure = 1
+        self.actualTemp = 180
+        self.actualVaporPressure = 0.1
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update_plot_dosing)
         self.timer.start(1000)
 
     def update_plot_dosing(self):
         while self.tcurr <=10:
-            self.actualVaporPressure += 10
-            self.actualPressureTrace.setData(self.actualTemp,self.actualVaporPressure)
+            self.actualVaporPressure = self.actualVaporPressure*1.2
+            self.actualTemp += 1
+            self.actualPressureTrace.setData(x=[self.actualTemp],y=[self.actualVaporPressure])
             tcurr += 1
         self.timer.stop()
 
 
-    def launch_tube_fill_window(self):
-        '''Not using for now'''
-        self.new_window = TubeFillWindow()
-        self.new_window.show()
+    # def launch_tube_fill_window(self):
+        # '''Not using for now'''
+        # self.new_window = TubeFillWindow()
+        # self.new_window.show()
 
 if __name__ == "__main__":
     app = qw.QApplication(sys.argv)
