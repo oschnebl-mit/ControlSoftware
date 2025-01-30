@@ -27,18 +27,26 @@ class MainControlWindow(qw.QMainWindow):
         self.temp_plot = pg.PlotWidget()
         self.highVac_plot = pg.PlotWidget()
         self.rxnVac_plot = pg.PlotWidget()
+        self.rxnTemp_plot = pg.PlotWidget()
 
         # font=QtGui.QFont()
         # font.setPixelSize(45)
         # for plt in [self.temp_plot,self.highVac_plot,self.rxnVac_plot]:
         #     plt.getAxis("left").tickFont = font
 
-        self.temp_plot.setLabel('left',"Temperature",units="K",color='#ba4a00',**{'font-size': '14pt'})
-        self.highVac_plot.setLabel('left',"High Vac Pressure",units = "Torr",color='#2e86c1',**{'font-size': '14pt'})
-        self.rxnVac_plot.setLabel('left',"Process Pressure",units = "Torr",color='#d4ac0d',**{'font-size': '14pt'})
+        self.pressurePen = pg.mkPen(color='#00ff41',width=3)
+        self.flowPen = pg.mkPen(color='#F5D300',width=3)
+        self.tempPen = pg.mkPen(color='#08F7FE',width=3)
+
+        self.temp_plot.setLabel('left',"Temperature",units="K",color='#08F7FE',**{'font-size': '12pt'})
+        self.highVac_plot.setLabel('left',"High Vac Pressure",units = "Torr",color='#00ff41',**{'font-size': '12pt'})
+        self.rxnTemp_plot.setLabel('left',"Process Temperature",units="K",color='#08F7FE',**{'font-size': '12pt'})
+        self.rxnVac_plot.setLabel('left',"Process Pressure",units = "Torr",color='#00ff41',**{'font-size': '12pt'})
 
         self.highVac_plot.setXLink(self.temp_plot)
-        self.rxnVac_plot.setXLink(self.temp_plot)
+        self.rxnVac_plot.setXLink(self.rxnTemp_plot)
+
+        self.rxnVac_plot.setLabel('bottom',"Time",units='min',color='#e0e0e0',**{'font-size':'12pt'})
 
         self.currentProcessPlot = pg.PlotWidget()
         self.cp2 = None
@@ -92,12 +100,13 @@ class MainControlWindow(qw.QMainWindow):
         
 
         ## Add widgets to layout grid w/ row, col, rowspan, colspan
-        layout.addLayout(self.purgeGroup,0,0,1,1)
-        layout.addWidget(self.currentProcessPlot,1,0,2,2)
+        layout.addLayout(self.purgeGroup,0,0,2,1)
+        layout.addWidget(self.currentProcessPlot,2,0,2,2)
 
         layout.addWidget(self.temp_plot,0,2,1,1)
         layout.addWidget(self.highVac_plot,1,2,1,1)
-        layout.addWidget(self.rxnVac_plot,2,2,1,1)
+        layout.addWidget(self.rxnTemp_plot,2,2,1,1)
+        layout.addWidget(self.rxnVac_plot,3,2,1,1)
 
         self.tree = BrooksParamTree()
         self.mfcButton = qw.QPushButton("Re-initialize MFCs")
@@ -106,11 +115,27 @@ class MainControlWindow(qw.QMainWindow):
         self.treeGroup.addWidget(self.tree)
         
         layout.addLayout(self.treeGroup,0,1,1,1)
-        self.mfcButton.clicked.connect(self.setupMFCs)
+        
+        layout.setContentsMargins(25,11,12,30)
 
-        self.brooks0254 = Brooks0254(pyvisaConnection, deviceAddress='29751')
+        if pyvisaConnection == None:
+            print('Skipping MFC initialize')
+        else:
+            self.brooks0254 = Brooks0254(pyvisaConnection, deviceAddress='29751')
+            self.mfcButton.clicked.connect(self.setupMFCs)
 
         self.show()
+
+        ########## making plots zoomable #############
+        ## first add fake data
+        i=0
+        for plt in [self.highVac_plot,self.rxnVac_plot,self.temp_plot,self.rxnTemp_plot,]:
+            plt.setMouseEnabled(y=None)
+            if i < 2:
+                plt.plot(y=np.random.normal(size=100),pen=self.pressurePen)
+            else:
+                plt.plot(y=np.random.normal(size=100),pen=self.tempPen)
+            i+=1
 
     def abort_process(self):
         ## in practice would set flows to zero
@@ -127,7 +152,7 @@ class MainControlWindow(qw.QMainWindow):
         if self.cp2 is not None:
             self.cp2.clear()
         
-        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#3f51b5',**{'font-size': '14pt'})
+        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#00ff41',**{'font-size': '14pt'})
         
         ### for second trace #######
         self.cp2 = pg.ViewBox()
@@ -135,14 +160,14 @@ class MainControlWindow(qw.QMainWindow):
         self.currentProcessPlot.scene().addItem(self.cp2)
         self.currentProcessPlot.getAxis('right').linkToView(self.cp2)
         self.cp2.setXLink(self.currentProcessPlot)
-        self.currentProcessPlot.setLabel('right',"Ar Flow",units='sccm',color='#52be80',**{'font-size':'14pt'})
+        self.currentProcessPlot.setLabel('right',"Ar Flow",units='sccm',color='#F5D300',**{'font-size':'14pt'})
 
         self.updateViews()
         self.currentProcessPlot.getViewBox().sigResized.connect(self.updateViews)
         #################
 
-        self.tube_pressure_trace = self.currentProcessPlot.plot(pen='#3f51b5')
-        self.sccm_Ar_trace = pg.PlotCurveItem(pen='#52be80')
+        self.tube_pressure_trace = self.currentProcessPlot.plot(pen=self.pressurePen)
+        self.sccm_Ar_trace = pg.PlotCurveItem(pen=self.flowPen)
         self.cp2.addItem(self.sccm_Ar_trace)
 
 
@@ -222,11 +247,17 @@ class MainControlWindow(qw.QMainWindow):
         # self.new_window = TubeFillWindow()
         # self.new_window.show()
 
-if __name__ == "__main__":
-    rm = pyvisa.ResourceManager()
-    brooks = rm.open_resource('ASRL4::INSTR',read_termination='\r',write_termination='\r')
+hometest = True
 
+if __name__ == "__main__":
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
-    window = MainControlWindow(brooks)
+
+    if hometest == False:
+        rm = pyvisa.ResourceManager()
+        brooks = rm.open_resource('ASRL4::INSTR',read_termination='\r',write_termination='\r')
+        window = MainControlWindow(brooks)
+    else:
+        window = MainControlWindow(pyvisaConnection=None)
+
     sys.exit(app.exec())
