@@ -130,7 +130,7 @@ class MainControlWindow(qw.QMainWindow):
         ## first add fake data
         i=0
         for plt in [self.highVac_plot,self.rxnVac_plot,self.temp_plot,self.rxnTemp_plot,]:
-            plt.setMouseEnabled(y=None)
+            # plt.setMouseEnabled(y=None)
             if i < 2:
                 plt.plot(y=np.random.normal(size=100),pen=self.pressurePen)
             else:
@@ -153,7 +153,7 @@ class MainControlWindow(qw.QMainWindow):
             self.cp2.clear()
         
         self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#00ff41',**{'font-size': '14pt'})
-        
+        self.currentProcessPlot.setLabel('bottom','Time',units='s',color='#e0e0e0',**{'font-size':'14pt'})
         ### for second trace #######
         self.cp2 = pg.ViewBox()
         self.currentProcessPlot.showAxis('right')
