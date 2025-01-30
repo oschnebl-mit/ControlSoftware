@@ -28,8 +28,9 @@ class BrooksParamTree(ParameterTree):
                 {'name':'Time Base','type':'int','value':2},
                 {'name':'Decimal Point','type':'int','value':1},
                 {'name':'SP Function','type':'int','value':1}
-                ]}
-
+                ]},
+                {'name':'Visa Resource','type':'str','value':'ASRL4::INSTR'},
+                {'name':'Device Address','type':'str','value':'29751'}
 
                     ]}
                 ]
@@ -41,6 +42,9 @@ class BrooksParamTree(ParameterTree):
     def emitChange(self,param,changes):
         self.paramChange.emit(param,changes)
 
-    def getParamValue(self,branch,child):
-        print(self.p.param('MFC Setup Parameters','MFC 3 Setup Parameters','Gas Factor').value())
+    def getMFCParamValue(self,branch,child):
+        # print(self.p.param('MFC Setup Parameters','MFC 3 Setup Parameters','Gas Factor').value())
         return self.p.param('MFC Setup Parameters',branch,child).value()
+    
+    def get0254ParamValue(self,branch,child):
+        return self.p.param(branch,child).value()

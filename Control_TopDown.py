@@ -1,4 +1,4 @@
-import sys,qdarkstyle,pyvisa
+import sys,qdarkstyle
 from time import time
 from PyQt5 import QtGui,QtCore
 import PyQt5.QtWidgets as qw 
@@ -7,16 +7,39 @@ import numpy as np
 
 from Control_Parameters import BrooksParamTree
 from Brooks0254_BuildUp import Brooks0254, MassFlowController
+# from misc_helpers import add_line_glow
 
 # from TubeFurnaceFillGui import TubeFillWindow
 
 class MainControlWindow(qw.QMainWindow):
-    def __init__(self, pyvisaConnection):
+    def __init__(self, demoMode = False):
         super().__init__()
         self.setWindowTitle('Control Panel')
 
-        self.resize(1280, 720)  # Non- maximized size
-        # self.showMaximized()
+        self.resize(2560, 1440)  # Non- maximized size
+        if demoMode == False:
+            self.showMaximized()
+
+        self.init_UI(demoMode)
+
+        if demoMode == True:
+            print('Skipping MFC initialize')
+        else:
+            self.rm = pyvisa.ResourceManager()
+            try:
+                self.pyvisaConnection = rm.open_resource('ASRL4::INSTR',read_termination='\r',write_termination='\r')
+                self.brooks0254 = Brooks0254(pyvisaConnection, deviceAddress='29751')
+                
+            except VisaIOError:
+                print('Failed to initialize Brooks0254 controller')
+            ## even if setup fails, the button should work if not in demo mode
+            self.mfcButton.clicked.connect(self.setupMFCs)
+
+        self.show()
+
+    def init_UI(self,demoMode):
+        ### # Dedicated colors which look "good"
+        # colors = ['#08F7FE', '#FE53BB', '#F5D300', '#00ff41', '#FF0000', '#9467bd', ]
         
         ## Create an empty box to hold all the following widgets
         self.mainbox = qw.QWidget()
@@ -34,14 +57,18 @@ class MainControlWindow(qw.QMainWindow):
         # for plt in [self.temp_plot,self.highVac_plot,self.rxnVac_plot]:
         #     plt.getAxis("left").tickFont = font
 
-        self.pressurePen = pg.mkPen(color='#00ff41',width=3)
+        # self.pressurePen = pg.mkPen(color='#00ff41',width=3)
+        # self.flowPen = pg.mkPen(color='#F5D300',width=3)
+        # self.tempPen = pg.mkPen(color='#08F7FE',width=3)
+
+        self.pressurePen = pg.mkPen(color='#FE53BB',width=3)
         self.flowPen = pg.mkPen(color='#F5D300',width=3)
         self.tempPen = pg.mkPen(color='#08F7FE',width=3)
 
         self.temp_plot.setLabel('left',"Temperature",units="K",color='#08F7FE',**{'font-size': '12pt'})
-        self.highVac_plot.setLabel('left',"High Vac Pressure",units = "Torr",color='#00ff41',**{'font-size': '12pt'})
+        self.highVac_plot.setLabel('left',"High Vac Pressure",units = "Torr",color='#FE53BB',**{'font-size': '12pt'})
         self.rxnTemp_plot.setLabel('left',"Process Temperature",units="K",color='#08F7FE',**{'font-size': '12pt'})
-        self.rxnVac_plot.setLabel('left',"Process Pressure",units = "Torr",color='#00ff41',**{'font-size': '12pt'})
+        self.rxnVac_plot.setLabel('left',"Process Pressure",units = "Torr",color='#FE53BB',**{'font-size': '12pt'})
 
         self.highVac_plot.setXLink(self.temp_plot)
         self.rxnVac_plot.setXLink(self.rxnTemp_plot)
@@ -60,21 +87,9 @@ class MainControlWindow(qw.QMainWindow):
         self.purgeButton.clicked.connect(self.run_purge_process)
         self.stopButton.clicked.connect(self.abort_process)
 
-        self.buttonGroup = qw.QHBoxLayout()
-        self.purgeGroup = qw.QVBoxLayout()
-        self.buttonGroup.addWidget(self.purgeButton)
-        self.buttonGroup.addWidget(self.stopButton)
-        self.purgeGroup.addLayout(self.buttonGroup)
-        self.purgeGroup.addWidget(self.ppiLabel)
-        self.purgeGroup.addWidget(self.purgePressureInput)
-
-        self.doseButtonGroup = qw.QHBoxLayout()
         self.doseH2SButton = qw.QPushButton("Dose with H2S")
         self.doseH2Button = qw.QPushButton("Dose with H2")
-        self.doseButtonGroup.addWidget(self.doseH2SButton)
-        self.doseButtonGroup.addWidget(self.doseH2Button)
-        self.purgeGroup.addLayout(self.doseButtonGroup)
-
+    
         self.doseH2SInput = qw.QLineEdit()
         self.doseH2SInput.setText('10')
         self.doseH2SInput.setValidator(QtGui.QIntValidator())
@@ -85,66 +100,76 @@ class MainControlWindow(qw.QMainWindow):
         self.doseH2Input.setValidator(QtGui.QIntValidator())
         self.doseH2Label = qw.QLabel('H2 Dose Volume:')
 
-        self.doseLabelGroup = qw.QHBoxLayout()
-        self.doseLabelGroup.addWidget(self.doseH2Label)
-        self.doseLabelGroup.addWidget(self.doseH2SLabel)
-
-        self.doseInputGroup = qw.QHBoxLayout()
-        self.doseInputGroup.addWidget(self.doseH2Input)
-        self.doseInputGroup.addWidget(self.doseH2SInput)
-
-        self.purgeGroup.addLayout(self.doseLabelGroup)
-        self.purgeGroup.addLayout(self.doseInputGroup)
-
         self.doseH2SButton.clicked.connect(self.plotDosing)
-        
-
-        ## Add widgets to layout grid w/ row, col, rowspan, colspan
-        layout.addLayout(self.purgeGroup,0,0,2,1)
-        layout.addWidget(self.currentProcessPlot,2,0,2,2)
-
-        layout.addWidget(self.temp_plot,0,2,1,1)
-        layout.addWidget(self.highVac_plot,1,2,1,1)
-        layout.addWidget(self.rxnTemp_plot,2,2,1,1)
-        layout.addWidget(self.rxnVac_plot,3,2,1,1)
-
+    
         self.tree = BrooksParamTree()
         self.mfcButton = qw.QPushButton("Re-initialize MFCs")
-        self.treeGroup = qw.QVBoxLayout()
-        self.treeGroup.addWidget(self.mfcButton)
-        self.treeGroup.addWidget(self.tree)
+
         
-        layout.addLayout(self.treeGroup,0,1,1,1)
+        ## Add widgets to layout grid w/ row, col, rowspan, colspan
+        ## Top left tree and buttons
+        layout.addWidget(self.mfcButton,0,0,1,2)
+        layout.addWidget(self.tree,1,0,4,2)
+
+        ## Top middle buttons and inputs (start at col 3, row 0)
+        layout.addWidget(self.purgeButton,0,3,1,1)
+        layout.addWidget(self.stopButton,0,4,1,1)
+
+        layout.addWidget(self.ppiLabel,1,3,1,1)
+        layout.addWidget(self.purgePressureInput,2,3,1,1)
+
+        layout.addWidget(self.doseH2SButton,3,3,1,1)
+        layout.addWidget(self.doseH2SLabel,4,3,1,1)
+        layout.addWidget(self.doseH2SInput,5,3,1,1)
         
-        layout.setContentsMargins(25,11,12,30)
+        layout.addWidget(self.doseH2Button,3,4,1,1)
+        layout.addWidget(self.doseH2Label,4,4,1,1)
+        layout.addWidget(self.doseH2Input,5,4,1,1)
 
-        if pyvisaConnection == None:
-            print('Skipping MFC initialize')
-        else:
-            self.brooks0254 = Brooks0254(pyvisaConnection, deviceAddress='29751')
-            self.mfcButton.clicked.connect(self.setupMFCs)
+        ## current process plot bottom left (start at row 7, col 0)
+        layout.addWidget(self.currentProcessPlot,7,0,7,10)
 
-        self.show()
+        ## Right Hand column of plots
+        layout.addWidget(self.temp_plot,0,10,3,15)
+        layout.addWidget(self.highVac_plot,3,10,3,15)
+        layout.addWidget(self.rxnVac_plot,7,10,4,15)
+        layout.addWidget(self.rxnTemp_plot,11,10,4,15)
 
-        ########## making plots zoomable #############
-        ## first add fake data
-        i=0
-        for plt in [self.highVac_plot,self.rxnVac_plot,self.temp_plot,self.rxnTemp_plot,]:
-            # plt.setMouseEnabled(y=None)
-            if i < 2:
-                plt.plot(y=np.random.normal(size=100),pen=self.pressurePen)
-            else:
-                plt.plot(y=np.random.normal(size=100),pen=self.tempPen)
-            i+=1
+        
+        # layout.setContentsMargins(25,11,12,30)
+
+        
+
+        if demoMode == True:
+            ## add fake data to tracking plots
+            i=0
+            for plt in [self.highVac_plot,self.rxnVac_plot,self.temp_plot,self.rxnTemp_plot,]:
+                # plt.setMouseEnabled(y=None)
+                if i < 2:
+                    plt.plot(y=np.random.normal(size=100),pen=self.pressurePen)
+                else:
+                    plt.plot(y=np.random.normal(size=100),pen=self.tempPen)
+                i+=1     
+
+        ## updating data with lineglow creates some issues
+        # for plt in [self.highVac_plot,self.rxnVac_plot,self.temp_plot,self.rxnTemp_plot,]:
+        #     add_line_glow(plt)  
 
     def abort_process(self):
         ## in practice would set flows to zero
         self.timer.stop()
 
     def setupMFCs(self):
-        gf1 = self.tree.getParamValue('MFC 1 Setup Parameters','Gas Factor')
-        gf2 = self.tree.getParamValue('MFC 2 Setup Parameters','Gas Factor')
-        gf3 = self.tree.getParamValue('MFC 3 Setup Parameters','Gas Factor')
+        ''' This function is meant to re-initialize the MFCs and their controller with the parameters in the tree, if needed'''
+        ## initialize visa connection (not sure if this will error if the first time worked)
+        self.visaInstr = self.tree.get0254ParamValue('MFC Setup Parameters','Visa Resource')
+        self.deviceAddress = self.tree.get0254ParamValue('MFC Setup Parameters','Device Address')
+        self.pyvisaConnection = rm.open_resource(self.visaInstr,read_termination='\r',write_termination='\r')
+        self.brooks0254 = Brooks0254(self.pyvisaConnection, deviceAddress=self.deviceAddress)
+        ## set MFC parameters (right now just changes the gas factor)
+        gf1 = self.tree.getMFCParamValue('MFC 1 Setup Parameters','Gas Factor')
+        gf2 = self.tree.getMFCParamValue('MFC 2 Setup Parameters','Gas Factor')
+        gf3 = self.tree.getMFCParamValue('MFC 3 Setup Parameters','Gas Factor')
         self.brooks0254.setupMFCs([gf1,gf2,gf3])
 
     def run_purge_process(self):
@@ -152,7 +177,7 @@ class MainControlWindow(qw.QMainWindow):
         if self.cp2 is not None:
             self.cp2.clear()
         
-        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#00ff41',**{'font-size': '14pt'})
+        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#FE53BB',**{'font-size': '14pt'})
         self.currentProcessPlot.setLabel('bottom','Time',units='s',color='#e0e0e0',**{'font-size':'14pt'})
         ### for second trace #######
         self.cp2 = pg.ViewBox()
@@ -199,6 +224,7 @@ class MainControlWindow(qw.QMainWindow):
         self.tube_pressure_data.append(actual_tube_pressure+Ar_flow)
         self.sccm_Ar_data.append(Ar_flow)
         self.time_data.append(tcurr)
+        tcurr += 1
         
         self.tube_pressure_trace.setData(self.time_data, self.tube_pressure_data)
         self.sccm_Ar_trace.setData(self.time_data,self.sccm_Ar_data)
@@ -217,16 +243,18 @@ class MainControlWindow(qw.QMainWindow):
         self.currentProcessPlot.clear()
         if self.cp2 is not None:
             self.cp2.clear()
+            self.currentProcessPlot.setLabel('right', None)
+
         
         self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#3f51b5',**{'font-size': '14pt'})
         self.currentProcessPlot.setLabel('bottom',"Temperature",units='K',color='#3f51b5',**{'font-size': '14pt'})
         Trange = np.linspace(180,212)
         self.calcVaporPressure = Antoine(Ah2s,Bh2s,Ch2s,Trange)
-        self.calcVaporPressureTrace = self.currentProcessPlot.plot(Trange,self.calcVaporPressure,pen='#3f51b5')
+        self.calcVaporPressureTrace = self.currentProcessPlot.plot(Trange,self.calcVaporPressure,pen=pg.mkPen(color='#3f51b5',width=2))
         self.actualPressureTrace = pg.ScatterPlotItem(pen='#52be80',symbol='o')
         self.currentProcessPlot.addItem(self.actualPressureTrace)
         
-        self.tcurr = 0
+        self.t0 = time()
         self.actualTemp = 180
         self.actualVaporPressure = 0.1
         self.timer = QtCore.QTimer()
@@ -234,12 +262,14 @@ class MainControlWindow(qw.QMainWindow):
         self.timer.start(1000)
 
     def update_plot_dosing(self):
-        while self.tcurr <=10:
+        tcurr = time() - self.t0
+        if tcurr <=10:
             self.actualVaporPressure = self.actualVaporPressure*1.2
             self.actualTemp += 1
             self.actualPressureTrace.setData(x=[self.actualTemp],y=[self.actualVaporPressure])
-            tcurr += 1
-        self.timer.stop()
+            
+        else:
+            self.timer.stop()
 
 
     # def launch_tube_fill_window(self):
@@ -247,17 +277,12 @@ class MainControlWindow(qw.QMainWindow):
         # self.new_window = TubeFillWindow()
         # self.new_window.show()
 
-hometest = True
+
 
 if __name__ == "__main__":
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
 
-    if hometest == False:
-        rm = pyvisa.ResourceManager()
-        brooks = rm.open_resource('ASRL4::INSTR',read_termination='\r',write_termination='\r')
-        window = MainControlWindow(brooks)
-    else:
-        window = MainControlWindow(pyvisaConnection=None)
+    window = MainControlWindow(demoMode = True)
 
     sys.exit(app.exec())
