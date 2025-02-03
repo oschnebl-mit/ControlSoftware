@@ -52,7 +52,7 @@ class PressureGauge:
         '''NOTE: PR1 - PR4 exist, but seems like PR1-PR3 are the same, PR4 is scientific notation'''
         command = f'@{self.__address}PR1?;FF'
         response = self.__connection.query(command)
-        if re.search('\d*ACK',response) is not None:
+        if re.search('\\d*ACK',response) is not None:
             return float(response.split('ACK')[0:3])
         else:
             print(f'Failed to receive pressure reading... Received {response}')
@@ -62,25 +62,57 @@ class PressureGauge:
         ''' From manuals, seems to be the same for both models. I have assumed these are the only settings of interest
         Note the ! sets, while ? is for queries'''
         response = self.__connection.query( f'@{self.__address}U!{unit};FF')
-        if re.search(f'\d*ACK',response) is None:
+        if re.search('\\d*ACK',response) is None:
             print(f'Failed to set pressure unit... Received {response}')
         response = self.__connection.query( f'@{self.__address}AD!{address};FF')
-        if re.search(f'\d*ACK',response) is None:
+        if re.search(f'\\d*ACK',response) is None:
             print(f'Failed to set address... Received {response}')
         else:
             self.__address = address ## assumes it succeded
         response = self.__connection.query( f'@{self.__address}BR!{baud_rate};FF')
-        if re.search("\d*ACK",response) is None:
+        if re.search("\\d*ACK",response) is None:
             print(f'Failed to set baud rate... Received {response}')
 
 
 if __name__ == "__main__":
+    from TubeFurnaceController import GenericSerialDevice
+    import serial,time
+    pyvisa.log_to_screen()
     rm = pyvisa.ResourceManager()
     print(rm.list_resources())
-    rsrc = rm.open_resource('ASRL4::INSTR')
+    rsrc = rm.open_resource('ASRL3::INSTR',read_termination = '\n')
+
+    rsrc.write('@254TST!ON;FF')
+    print(rsrc.read_bytes(12))
+    time.sleep(1)
     # print(rsrc.get_visa_attribute(encoding))
-    print(rsrc.query('@254AD?;FF'))
+    rsrc.write('@254TST!OFF;FF')
+    print(rsrc.read_bytes(12))
+    rsrc.close()
    
 
-    mksgauge = PressureGauge(rsrc)
-    print(mksgauge.__ask_address())
+    # mksgauge = PressureGauge(rsrc)
+    # print(mksgauge.__ask_address())
+    
+    # pgauge = GenericSerialDevice(com_port=3,parity=serial.PARITY_EVEN,testing=False,name='Temperature Controller')
+    # response = pgauge.ask('@254TST!ON;FF')
+    # print(response)
+    # pgauge.close_connection()
+
+    # ser = serial.Serial(
+    #     port="COM3", baudrate = 9600,
+    #     parity=serial.PARITY_NONE,
+    #     bytesize=8,stopbits=serial.STOPBITS_ONE, timeout=1)
+    # if ser.isOpen():
+    #     print(ser.name + ' is open...')
+    #     # for j in range(2):
+    #     #     print(ser.readline())
+    # ## Write ASCII Commands To TSI 4043 Flow Sensor
+    # ser.write(b'@253PR1?;FF') # test mode (flashes LED)  
+    
+    # for n in range(3):
+    #     rsp = ser.readline()
+    #     print(rsp)
+    #     print(rsp.decode())
+
+    # ser.close()
