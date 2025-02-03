@@ -4,9 +4,11 @@ from PyQt5 import QtGui,QtCore
 import PyQt5.QtWidgets as qw 
 import pyqtgraph as pg
 import numpy as np
+# import pyvisa # if not demoMode
 
-from Control_Parameters import BrooksParamTree
+from Control_Parameters import CtrlParamTree
 from Brooks0254_BuildUp import Brooks0254, MassFlowController
+from PressureGauge_BuildUp import PressureGauge
 # from misc_helpers import add_line_glow
 
 # from TubeFurnaceFillGui import TubeFillWindow
@@ -24,16 +26,26 @@ class MainControlWindow(qw.QMainWindow):
 
         if demoMode == True:
             print('Skipping MFC initialize')
+            print('Skipping pressure gauge initialize')
         else:
             self.rm = pyvisa.ResourceManager()
             try:
-                self.pyvisaConnection = rm.open_resource('ASRL4::INSTR',read_termination='\r',write_termination='\r')
-                self.brooks0254 = Brooks0254(pyvisaConnection, deviceAddress='29751')
-                
-            except VisaIOError:
-                print('Failed to initialize Brooks0254 controller')
+                self.brooksVisaConnection = self.rm.open_resource('ASRL4::INSTR',read_termination='\r',write_termination='\r')
+                self.brooks0254 = Brooks0254(self.brooksVisaConnection, deviceAddress='29751')
+            except pyvisa.errors.VisaIOError as error:
+                print(f'Failed to initialize Brooks0254 controller... Received:{error}')
+
+            try:
+                self.MKS902VisaConnection = self.rm.open_resource('ASRL1::INSTR',read_termination='\r',write_termination='\r')
+                self.MKS902B = PressureGauge(self.MKS902VisaConnection)
+                self.mks925VisaConnection = self.rm.open_resource('ASRL2::INSTR',read_termination='\r',write_termination='\r')
+                self.MKS925 = PressureGauge(self.mks925VisaConnection)
+            except pyvisa.VisaIOError as error:
+                print(f'Failed to initialize pressure gauges... Received: {error}')
             ## even if setup fails, the button should work if not in demo mode
             self.mfcButton.clicked.connect(self.setupMFCs)
+            self.mks925Button.clicked.connect(self.setupGauge('925'))
+            self.mks902Button.clicked.connect(self.setupGauge('902'))
 
         self.show()
 
@@ -50,16 +62,8 @@ class MainControlWindow(qw.QMainWindow):
         self.temp_plot = pg.PlotWidget()
         self.highVac_plot = pg.PlotWidget()
         self.rxnVac_plot = pg.PlotWidget()
-        self.rxnTemp_plot = pg.PlotWidget()
-
-        # font=QtGui.QFont()
-        # font.setPixelSize(45)
-        # for plt in [self.temp_plot,self.highVac_plot,self.rxnVac_plot]:
-        #     plt.getAxis("left").tickFont = font
-
-        # self.pressurePen = pg.mkPen(color='#00ff41',width=3)
-        # self.flowPen = pg.mkPen(color='#F5D300',width=3)
-        # self.tempPen = pg.mkPen(color='#08F7FE',width=3)
+        # self.rxnTemp_plot = pg.PlotWidget()
+        self.rxnTemp_plot = boxedPlot('Reaction Temp','#08F7FE')
 
         self.pressurePen = pg.mkPen(color='#FE53BB',width=3)
         self.flowPen = pg.mkPen(color='#F5D300',width=3)
@@ -102,14 +106,18 @@ class MainControlWindow(qw.QMainWindow):
 
         self.doseH2SButton.clicked.connect(self.plotDosing)
     
-        self.tree = BrooksParamTree()
+        self.tree = CtrlParamTree()
         self.mfcButton = qw.QPushButton("Re-initialize MFCs")
+        self.mks925Button = qw.QPushButton("Re-initialize MKS925 (Pirani)")
+        self.mks902Button = qw.QPushButton("Re-initialize MKS 902B (piezo)")
 
         
         ## Add widgets to layout grid w/ row, col, rowspan, colspan
         ## Top left tree and buttons
         layout.addWidget(self.mfcButton,0,0,1,2)
-        layout.addWidget(self.tree,1,0,4,2)
+        layout.addWidget(self.mks925Button,1,0,1,2)
+        layout.addWidget(self.mks902Button,2,0,1,2)
+        layout.addWidget(self.tree,3,0,10,2)
 
         ## Top middle buttons and inputs (start at col 3, row 0)
         layout.addWidget(self.purgeButton,0,3,1,1)
@@ -126,19 +134,18 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.doseH2Label,4,4,1,1)
         layout.addWidget(self.doseH2Input,5,4,1,1)
 
-        ## current process plot bottom left (start at row 7, col 0)
-        layout.addWidget(self.currentProcessPlot,7,0,7,10)
+        ## current process plot middle bottom (start at row 7, col 3)
+        layout.addWidget(self.currentProcessPlot,7,3,10,7)
 
         ## Right Hand column of plots
         layout.addWidget(self.temp_plot,0,10,3,15)
         layout.addWidget(self.highVac_plot,3,10,3,15)
-        layout.addWidget(self.rxnVac_plot,7,10,4,15)
-        layout.addWidget(self.rxnTemp_plot,11,10,4,15)
+        layout.addWidget(self.rxnTemp_plot,7,10,4,15)
+        layout.addWidget(self.rxnVac_plot,11,10,4,15)
 
         
         # layout.setContentsMargins(25,11,12,30)
 
-        
 
         if demoMode == True:
             ## add fake data to tracking plots
@@ -159,6 +166,20 @@ class MainControlWindow(qw.QMainWindow):
         ## in practice would set flows to zero
         self.timer.stop()
 
+    def setup925Gauge(self):
+        ''' This function is meant to re-initialize either pressure gauge with the values in the parameter tree'''
+        unit = self.tree.getPressureParamValue('MKS 925 Setup Parameters','Pressure Unit')
+        addr = self.tree.getPressureParamValue('MKS 925 Setup Parameters','Address')
+        br = self.tree.getPressureParamValue('MKS 925 Setup Parameters','Baud Rate')
+        self.MKS925.set_gauge_params(unit,address,baud_rate)
+
+    def setup925Gauge(self):
+        ''' This function is meant to re-initialize either pressure gauge with the values in the parameter tree'''
+        unit = self.tree.getPressureParamValue('MKS 902B Setup Parameters','Pressure Unit')
+        addr = self.tree.getPressureParamValue('MKS 902B Setup Parameters','Address')
+        br = self.tree.getPressureParamValue('MKS 902B Setup Parameters','Baud Rate')
+        self.MKS902B.set_gauge_params(unit,address,baud_rate)
+
     def setupMFCs(self):
         ''' This function is meant to re-initialize the MFCs and their controller with the parameters in the tree, if needed'''
         ## initialize visa connection (not sure if this will error if the first time worked)
@@ -173,6 +194,7 @@ class MainControlWindow(qw.QMainWindow):
         self.brooks0254.setupMFCs([gf1,gf2,gf3])
 
     def run_purge_process(self):
+        ''' For demo mode: looks like the tube furnace purge plot, displays updating placeholder data, responds to fill pressure and stop button or pressure condition'''
         self.currentProcessPlot.clear()
         if self.cp2 is not None:
             self.cp2.clear()
@@ -210,6 +232,7 @@ class MainControlWindow(qw.QMainWindow):
             self.cp2.linkedViewChanged(self.currentProcessPlot.getViewBox(), self.cp2.XAxis)
 
     def update_plot_purging(self):
+        ''' For demo mode: updates with self-generated data, stops on pressure condition'''
         self.stopPressure = int(self.purgePressureInput.text())
         tcurr = time() - self.t0
         actual_tube_pressure = self.tube_pressure_data[-1]
@@ -230,6 +253,8 @@ class MainControlWindow(qw.QMainWindow):
         self.sccm_Ar_trace.setData(self.time_data,self.sccm_Ar_data)
 
     def plotDosing(self):
+        ''' For demo mode: plots the H2S vapor pressure curve, and a point increasing with time for 10 s. 
+        Plan is to replace self-generated point with measured (P,T), but maybe we will want P or sccm over time'''
         # m_h2s = 34.076 #amu
         m_h2s = 5.657e-26 # kg
         Ah2s = 4.43681	
@@ -262,6 +287,7 @@ class MainControlWindow(qw.QMainWindow):
         self.timer.start(1000)
 
     def update_plot_dosing(self):
+        '''For demo mode'''
         tcurr = time() - self.t0
         if tcurr <=10:
             self.actualVaporPressure = self.actualVaporPressure*1.2
@@ -277,6 +303,24 @@ class MainControlWindow(qw.QMainWindow):
         # self.new_window = TubeFillWindow()
         # self.new_window.show()
 
+class boxedPlot(qw.QWidget):
+    def __init__(self, plot_title, color):
+        super().__init__()
+        masterLayout = qw.QVBoxLayout()
+        self.pen = pg.mkPen(color, width=1.25)
+
+        layout = qw.QVBoxLayout()
+        self.group = qw.QGroupBox(plot_title)
+        self.plot = pg.PlotWidget()
+        self.plot.getPlotItem().showGrid(x=True, y=True, alpha=1)
+        if "qdarkstyle" in sys.modules:
+            self.plot.setBackground((25, 35, 45))
+
+        self.group.setLayout(layout)
+        layout.addWidget(self.plot)
+        masterLayout.addWidget(self.group)
+
+        self.setLayout(masterLayout)
 
 
 if __name__ == "__main__":

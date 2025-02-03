@@ -54,8 +54,12 @@ class Brooks0254:
             MFC.setup_MFC()
     
     def setupMFCs(self,gf):
+        '''Currently just sets the gas factor to a value from the parameter tree'''
         for n, MFC in enumerate(self.MFC_list,start=1):
             MFC.setup_MFC(gas_factor=gf[n-1],rate_units=18,time_base=2,decimal_point=1, SP_func = 1)
+
+    def readValue(self):
+        return 0
 
     '''
     Things to set up for each MFC

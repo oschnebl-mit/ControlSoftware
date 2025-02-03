@@ -3,7 +3,7 @@ from pyqtgraph.parametertree import Parameter, ParameterTree
 
 paramChange = pg.QtCore.pyqtSignal(object,object)
 
-class BrooksParamTree(ParameterTree):
+class CtrlParamTree(ParameterTree):
     def __init__(self):
         super().__init__()
         self.params = [
@@ -32,7 +32,17 @@ class BrooksParamTree(ParameterTree):
                 {'name':'Visa Resource','type':'str','value':'ASRL4::INSTR'},
                 {'name':'Device Address','type':'str','value':'29751'}
 
-                    ]}
+                    ]},
+                {'name':'MKS 902B Setup Parameters','type':'group','children':[
+                    {'name':'Pressure unit','type':'list','limits':['TORR','MBAR'],'value':'TORR'},
+                    {'name':'Address','type':'str','value':'254'},
+                    {'name':'Baud Rate','type':'list','limits':['4800','9600','19200','38400','57600','115200','230400'],'value':'9600'}
+                ]},
+                {'name':'MKS 9025 Setup Parameters','type':'group','children':[
+                    {'name':'Pressure unit','type':'str','limits':['TORR','MBAR'],'value':'TORR'},
+                    {'name':'Address','type':'str','value':'254'},
+                    {'name':'Baud Rate','type':'list','limits':['4800','9600','19200','38400','57600','115200','230400'],'value':'9600'}
+                ]}
                 ]
         self.p = Parameter.create(name='self.params',type='group',children=self.params)
         self.setParameters(self.p,showTop=False)
@@ -47,4 +57,7 @@ class BrooksParamTree(ParameterTree):
         return self.p.param('MFC Setup Parameters',branch,child).value()
     
     def get0254ParamValue(self,branch,child):
+        return self.p.param(branch,child).value()
+
+    def getPressureParamValue(self,branch,child):
         return self.p.param(branch,child).value()
