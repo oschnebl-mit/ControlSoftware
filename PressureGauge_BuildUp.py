@@ -77,7 +77,7 @@ class PressureGauge:
 if __name__ == "__main__":
     from TubeFurnaceController import GenericSerialDevice
     import serial,time
-    pyvisa.log_to_screen()
+    # pyvisa.log_to_screen() ## use log to screen when debugging serial comms
     rm = pyvisa.ResourceManager()
     print(rm.list_resources())
     rsrc = rm.open_resource('ASRL3::INSTR',read_termination = '\n')
