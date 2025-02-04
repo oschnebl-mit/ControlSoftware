@@ -4,7 +4,6 @@ from pyqtgraph.parametertree import Parameter, ParameterTree
 
 paramChange = pg.QtCore.pyqtSignal(object,object)
 
-
 class CtrlParamTree(ParameterTree):
     def __init__(self):
         super().__init__()
@@ -34,7 +33,6 @@ class CtrlParamTree(ParameterTree):
                 {'name':'Visa Resource','type':'str','value':'ASRL4::INSTR'},
                 {'name':'Device Address','type':'str','value':'29751'}
 
-
                     ]},
                 {'name':'MKS 902B Setup Parameters','type':'group','children':[
                     {'name':'Pressure unit','type':'list','limits':['TORR','MBAR'],'value':'TORR'},
@@ -56,14 +54,12 @@ class CtrlParamTree(ParameterTree):
     def emitChange(self,param,changes):
         self.paramChange.emit(param,changes)
 
-
     def getMFCParamValue(self,branch,child):
         # print(self.p.param('MFC Setup Parameters','MFC 3 Setup Parameters','Gas Factor').value())
         return self.p.param('MFC Setup Parameters',branch,child).value()
     
     def get0254ParamValue(self,branch,child):
         return self.p.param(branch,child).value()
-
 
     def getPressureParamValue(self,branch,child):
         return self.p.param(branch,child).value()

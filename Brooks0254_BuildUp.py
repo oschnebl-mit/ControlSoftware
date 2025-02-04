@@ -54,8 +54,12 @@ class Brooks0254:
             MFC.setup_MFC()
     
     def setupMFCs(self,gf):
+        '''Currently just sets the gas factor to a value from the parameter tree'''
         for n, MFC in enumerate(self.MFC_list,start=1):
             MFC.setup_MFC(gas_factor=gf[n-1],rate_units=18,time_base=2,decimal_point=1, SP_func = 1)
+
+    def readValue(self):
+        return 0
 
     '''
     Things to set up for each MFC
@@ -222,8 +226,12 @@ class MassFlowController:
 
 if __name__ == "__main__":
     rm = pyvisa.ResourceManager()
+<<<<<<< HEAD
+    brooks = rm.open_resource('ASRL4::INSTR',read_termination='\r',write_termination='\r')
+=======
     print(rm.list_resources())
     brooks = rm.open_resource('ASRL3::INSTR',read_termination='\r',write_termination='\r')
     print(brooks.query('AZI'))
+>>>>>>> d6419e66ca2d8aa71e74ebb1ef7e25abe537b67a
 
     brooks4channel = Brooks0254(brooks, deviceAddress='29751')
