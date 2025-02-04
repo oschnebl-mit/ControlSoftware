@@ -93,11 +93,14 @@ class MainControlWindow(qw.QMainWindow):
         # self.rxnTemp_plot.setLabel('left',"Process Temperature",units="K",color='#08F7FE',**{'font-size': '12pt'})
         # self.rxnVac_plot.setLabel('left',"Process Pressure",units = "Torr",color='#FE53BB',**{'font-size': '12pt'})
 
+        # self.rxnVac_plot.setLabel('bottom',"Time",units='min')
+        # self.cryoAxis = pg.DateAxisItem()
+        # self.cryoVac_plot.setAxisItems({'bottom':self.cryoAxis})
+        for plt in [self.cryoTemp_plot,self.cryoVac_plot,self.rxnTemp_plot,self.rxnVac_plot]:
+            plt.setAxisItems({'bottom':pg.DateAxisItem()})
 
         self.cryoVac_plot.setXLink(self.cryoTemp_plot)
         self.rxnVac_plot.setXLink(self.rxnTemp_plot)
-
-        self.rxnVac_plot.setLabel('bottom',"Time",units='min')
 
         self.currentProcessPlot_grp = BoxedPlot('Current Process','#08F7FE')
         self.currentProcessPlot = self.currentProcessPlot_grp.plot
@@ -151,6 +154,7 @@ class MainControlWindow(qw.QMainWindow):
         layout.setColumnStretch(2,2)
         layout.setColumnStretch(3,3)
         
+        layout.setContentsMargins(1,0,1,0)
         ## Add widgets to layout grid w/ row, col, rowspan, colspan
         ## Left Column:
         layout.addWidget(self.mfcButton,0,0,1,1)
@@ -357,46 +361,37 @@ class MainControlWindow(qw.QMainWindow):
     def log_process(self):
         ### this is the main function that should update plots and log file
         self.cryoVac_trace = self.cryoVac_plot.plot(pen=self.pressurePen)
-        self.cryoTemp_trace = self.cryoTemp_plot.plot(x=[0],y=[0],pen=self.tempPen)
-        self.rxnVac_trace = self.rxnVac_plot.plot(x=[0],y=[0],pen=self.pressurePen)
-        self.rxnTemp_trace = self.rxnTemp_plot.plot(x=[0],y=[0],pen=self.tempPen)
-
+        self.cryoTemp_trace = self.cryoTemp_plot.plot(pen=self.tempPen)
+        self.rxnVac_trace = self.rxnVac_plot.plot(pen=self.pressurePen)
+        self.rxnTemp_trace = self.rxnTemp_plot.plot(pen=self.tempPen)
 
         self.t1 = 0
-        # self.cryoVac_trace.setData(x=[0],y=[0])
+        self.cryoVac_trace.setData(x=[time()],y=[750])
+        self.cryoTemp_trace.setData(x=[time()],y=[500])
+        self.rxnVac_trace.setData(x=[time()],y=[100])
+        self.rxnTemp_trace.setData(x=[time()],y=[100])
 
         self.logging_timer = QtCore.QTimer()
         self.logging_timer.timeout.connect(self.update_logging_plots)
-        self.logging_timer.start(1000) ## every 1 s
+        self.logging_timer.start(10*1000) ## every 10 s
 
 
     def update_logging_plots(self):
         '''
-        When not demo mode:  
-        pressure_data = pressureplot.getData()
-        pressure_data.append(pgauge1.read())
-        pressure_trace.setData(pressure_data)
+        When timer times out, read gauges and update plots
         '''
-        if self.t1==0:
-            self.cryoVac_trace.setData(x=[0],y=[0])
-        self.t1 += 1
+        self.t1+=1
         rng = np.random.default_rng()
         xdata,ydata = self.cryoVac_trace.getData()
-        print('xdata = ',xdata)
-        print('ydata = ',ydata)
-        xdata = np.append(xdata,self.t1)
+        xdata = np.append(xdata,time())
         if self.demoMode == True:
             ydata = np.append(ydata,750+rng.random())
         else:
-            ydata.append(self.MKS925.readPressure())
+            ydata = np.append(ydata,self.MKS925.readPressure())
 
-        
         self.cryoVac_trace.setData(x=xdata,y=ydata)
         self.cryoVac_plot.getViewBox().autoRange()
         
-
-
-
 
     # def launch_tube_fill_window(self):
         # '''Not using for now'''
@@ -423,6 +418,42 @@ class BoxedPlot(qw.QWidget):
         masterLayout.addWidget(self.group)
 
         self.setLayout(masterLayout)
+
+class LoggingPlot(qw.QWidget):
+    def __init__(self, plot_title, measureType):
+        super().__init__()
+        masterLayout = qw.QVBoxLayout()
+        layout = qw.QVBoxLayout()
+        self.group = qw.QGroupBox(plot_title)
+        self.plot = pg.PlotWidget()
+        self.plot.getPlotItem().showGrid(x=True, y=True, alpha=1)
+        if "qdarkstyle" in sys.modules:
+            self.plot.setBackground((25, 35, 45))
+        self.group.setLayout(layout)
+        layout.addWidget(self.plot)
+        masterLayout.addWidget(self.group)
+        self.setLayout(masterLayout)
+        self.measureType = measureType
+        if measureType == 'pressure':
+            color = '#FE53BB'
+        elif measureType == 'temperature':
+            color = '#08F7FE'
+        self.pen = pg.mkPen(color, width=1.25)
+        self.trace = self.plot(pen=self.pen)
+
+    def update_logging_plot(self):
+        ## Not sure how to pass each instrument
+        xdata,ydata = self.trace.getData()
+        xdata = np.append(xdata,time())
+        if self.measureType == 'pressure':
+            ydata = np.append(ydata,self.readPressure())
+        elif self.measureType == 'temperature':
+            ydata = np.append(ydata,self.readTemperature())
+        self.trace.setData(x=xdata, y=ydata)
+        self.plot.getViewBox().autoRange()
+
+
+
 
 
 
