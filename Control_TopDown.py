@@ -131,54 +131,55 @@ class MainControlWindow(qw.QMainWindow):
         self.mks902Button = qw.QPushButton("Re-initialize MKS 902B (piezo)")
         
         '''
-        Some notes on the grid layout: I have chosen 16 row units and 25 column units somewhat arbitrarily based on relative sizes
-        The left column of buttons and the parameter tree span 2 column units and all 16 rows (each button takes 1 row)
-        The middle column has some buttons in two rows, then the current process plot spans 9 row units and 7 column units
-        The right column should be four equally sized updating plots, I've sized them as 4 row units and 15 column units.
+        Some notes on the grid layout: 
+        Because the buttons are small relative to the plots, the plots span many rows
+        Used setColumnStretch based on what looks right visually, seems a little funky.
 
         '''
         ## Fix the row widths to be more uniform
         for r in range(16):
             layout.setRowMinimumHeight(r,3)
-        for l in range(1,24):
-            layout.setColumnMinimumWidth(l,3)
+        
+        layout.setColumnStretch(0,2)
+        layout.setColumnStretch(1,2)
+        layout.setColumnStretch(2,2)
+        layout.setColumnStretch(3,3)
         
         ## Add widgets to layout grid w/ row, col, rowspan, colspan
-        ## Top left tree and buttons
-        layout.addWidget(self.mfcButton,0,0,1,2)
-        layout.addWidget(self.mks925Button,1,0,1,2)
-        layout.addWidget(self.mks902Button,2,0,1,2)
-        layout.addWidget(self.tree,3,0,13,2)
+        ## Left Column:
+        layout.addWidget(self.mfcButton,0,0,1,1)
+        layout.addWidget(self.mks925Button,1,0,1,1)
+        layout.addWidget(self.mks902Button,2,0,1,1)
+        layout.addWidget(self.tree,3,0,13,1)
 
+        ## Top middle buttons and inputs (start at col 1, row 0)
+        layout.addWidget(self.purgeButton,0,1,1,1)
+        layout.addWidget(self.stopButton,0,2,1,1)
 
-        ## Top middle buttons and inputs (start at col 3, row 0)
-        layout.addWidget(self.purgeButton,0,3,1,1)
-        layout.addWidget(self.stopButton,0,4,1,1)
+        layout.addWidget(self.ppiLabel,1,1,1,1)
+        layout.addWidget(self.purgePressureInput,2,1,1,1)
 
-        layout.addWidget(self.ppiLabel,1,3,1,1)
-        layout.addWidget(self.purgePressureInput,2,3,1,1)
-
-        layout.addWidget(self.doseH2SButton,3,3,1,1)
-        layout.addWidget(self.doseH2SLabel,4,3,1,1)
-        layout.addWidget(self.doseH2SInput,5,3,1,1)
+        layout.addWidget(self.doseH2SButton,3,1,1,1)
+        layout.addWidget(self.doseH2SLabel,4,1,1,1)
+        layout.addWidget(self.doseH2SInput,5,1,1,1)
         
-        layout.addWidget(self.doseH2Button,3,4,1,1)
-        layout.addWidget(self.doseH2Label,4,4,1,1)
-        layout.addWidget(self.doseH2Input,5,4,1,1)
+        layout.addWidget(self.doseH2Button,3,2,1,1)
+        layout.addWidget(self.doseH2Label,4,2,1,1)
+        layout.addWidget(self.doseH2Input,5,2,1,1)
 
-        layout.addWidget(qw.QLabel('Placeholder'),6,3,1,1)
-        layout.addWidget(qw.QLabel('Placeholder'),7,3,1,1)
-        layout.addWidget(qw.QLabel('Placeholder'),6,4,1,1)
-        layout.addWidget(qw.QLabel('Placeholder'),7,4,1,1)
+        layout.addWidget(qw.QLabel('Placeholder'),6,1,1,1)
+        layout.addWidget(qw.QLabel('Placeholder'),7,1,1,1)
+        layout.addWidget(qw.QLabel('Placeholder'),6,2,1,1)
+        layout.addWidget(qw.QLabel('Placeholder'),7,2,1,1)
 
-        ## current process plot middle bottom (start at row 7, col 3)
-        layout.addWidget(self.currentProcessPlot,7,3,9,7)
+        ## current process plot middle bottom (start at row 8, col 1)
+        layout.addWidget(self.currentProcessPlot,8,1,8,2)
 
         ## Right Hand column of plots
-        layout.addWidget(self.temp_plot,0,10,4,15)
-        layout.addWidget(self.highVac_plot,4,10,4,15)
-        layout.addWidget(self.rxnTemp_plot,8,10,4,15)
-        layout.addWidget(self.rxnVac_plot,12,10,4,15)
+        layout.addWidget(self.temp_plot,0,3,4,1)
+        layout.addWidget(self.highVac_plot,4,3,4,1)
+        layout.addWidget(self.rxnTemp_plot,8,3,4,1)
+        layout.addWidget(self.rxnVac_plot,12,3,4,1)
 
 
         if demoMode == True:
