@@ -19,18 +19,19 @@ from PressureGauge_BuildUp import PressureGauge
 class MainControlWindow(qw.QMainWindow):
     def __init__(self, demoMode = False):
         super().__init__()
+        self.demoMode = demoMode
         self.setWindowTitle('Control Panel')
 
         self.resize(1280,720) # non-maximized state
         # self.resize(2560, 1440)  # for home monitor
-        if demoMode == False:
+        if self.demoMode == False:
             self.showMaximized()
 
 
-        self.init_UI(demoMode)
+        self.init_UI()
 
 
-        if demoMode == True:
+        if self.demoMode == True:
             print('Skipping MFC initialize')
             print('Skipping pressure gauge initialize')
         else:
@@ -54,11 +55,12 @@ class MainControlWindow(qw.QMainWindow):
             self.mks925Button.clicked.connect(self.setupGauge('925'))
             self.mks902Button.clicked.connect(self.setupGauge('902'))
 
+        self.log_process()
 
         self.show()
 
 
-    def init_UI(self,demoMode):
+    def init_UI(self):
         ### # Dedicated colors which look "good"
         # colors = ['#08F7FE', '#FE53BB', '#F5D300', '#00ff41', '#FF0000', '#9467bd', ]
         
@@ -69,32 +71,37 @@ class MainControlWindow(qw.QMainWindow):
         self.mainbox.setLayout(layout)  # set the layout
 
 
-        self.temp_plot = pg.PlotWidget()
-        self.highVac_plot = pg.PlotWidget()
-        self.rxnVac_plot = pg.PlotWidget()
-        self.rxnTemp_plot = pg.PlotWidget()
-        # self.rxnTemp_plot = boxedPlot('Process Temperature','#08F7FE')
-
+        # self.cryoTemp_plot = pg.PlotWidget()
+        # self.cryoVac_plot = pg.PlotWidget()
+        # self.rxnVac_plot = pg.PlotWidget()
+        # self.rxnTemp_plot = pg.PlotWidget()
+        self.cryoTemp_plot_grp = BoxedPlot('Cryo Temperature','#08F7FE')
+        self.cryoVac_grp = BoxedPlot('Cryo Vacuum','#08F7FE')
+        self.rxnVac_grp = BoxedPlot('Process Pressure','#08F7FE')
+        self.rxnTemp_grp = BoxedPlot('Process Temperature','#08F7FE')
+        self.cryoTemp_plot = self.cryoTemp_plot_grp.plot
+        self.cryoVac_plot = self.cryoVac_grp.plot
+        self.rxnVac_plot = self.rxnVac_grp.plot
+        self.rxnTemp_plot = self.rxnTemp_grp.plot
 
         self.pressurePen = pg.mkPen(color='#FE53BB',width=2)
         self.flowPen = pg.mkPen(color='#F5D300',width=2)
         self.tempPen = pg.mkPen(color='#08F7FE',width=2)
 
+        # self.cryoTemp_plot.setLabel('left',"Temperature",units="K",color='#08F7FE',**{'font-size': '12pt'})
+        # self.cryoVac_plot.setLabel('left',"High Vac Pressure",units = "Torr",color='#FE53BB',**{'font-size': '12pt'})
+        # self.rxnTemp_plot.setLabel('left',"Process Temperature",units="K",color='#08F7FE',**{'font-size': '12pt'})
+        # self.rxnVac_plot.setLabel('left',"Process Pressure",units = "Torr",color='#FE53BB',**{'font-size': '12pt'})
 
-        self.temp_plot.setLabel('left',"Temperature",units="K",color='#08F7FE',**{'font-size': '12pt'})
-        self.highVac_plot.setLabel('left',"High Vac Pressure",units = "Torr",color='#FE53BB',**{'font-size': '12pt'})
-        self.rxnTemp_plot.setLabel('left',"Process Temperature",units="K",color='#08F7FE',**{'font-size': '12pt'})
-        self.rxnVac_plot.setLabel('left',"Process Pressure",units = "Torr",color='#FE53BB',**{'font-size': '12pt'})
 
-
-        self.highVac_plot.setXLink(self.temp_plot)
+        self.cryoVac_plot.setXLink(self.cryoTemp_plot)
         self.rxnVac_plot.setXLink(self.rxnTemp_plot)
 
+        self.rxnVac_plot.setLabel('bottom',"Time",units='min')
 
-        self.rxnVac_plot.setLabel('bottom',"Time",units='min',color='#e0e0e0',**{'font-size':'12pt'})
-
-
-        self.currentProcessPlot = pg.PlotWidget()
+        self.currentProcessPlot_grp = BoxedPlot('Current Process','#08F7FE')
+        self.currentProcessPlot = self.currentProcessPlot_grp.plot
+        # self.currentProcessPlot = pg.PlotWidget()
         self.cp2 = None
 
 
@@ -122,13 +129,12 @@ class MainControlWindow(qw.QMainWindow):
         self.doseH2Input.setValidator(QtGui.QIntValidator())
         self.doseH2Label = qw.QLabel('H2 Dose Volume:')
 
-
         self.doseH2SButton.clicked.connect(self.plotDosing)
     
         self.tree = CtrlParamTree()
         self.mfcButton = qw.QPushButton("Re-initialize MFCs")
         self.mks925Button = qw.QPushButton("Re-initialize MKS925 (Pirani)")
-        self.mks902Button = qw.QPushButton("Re-initialize MKS 902B (piezo)")
+        self.mks902Button = qw.QPushButton("Re-initialize MKS902B (Piezo)")
         
         '''
         Some notes on the grid layout: 
@@ -138,9 +144,9 @@ class MainControlWindow(qw.QMainWindow):
         '''
         ## Fix the row widths to be more uniform
         for r in range(16):
-            layout.setRowMinimumHeight(r,3)
+            layout.setRowMinimumHeight(r,1)
         
-        layout.setColumnStretch(0,2)
+        layout.setColumnStretch(0,1)
         layout.setColumnStretch(1,2)
         layout.setColumnStretch(2,2)
         layout.setColumnStretch(3,3)
@@ -173,35 +179,37 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(qw.QLabel('Placeholder'),7,2,1,1)
 
         ## current process plot middle bottom (start at row 8, col 1)
-        layout.addWidget(self.currentProcessPlot,8,1,8,2)
+        layout.addWidget(self.currentProcessPlot_grp,8,1,8,2)
 
         ## Right Hand column of plots
-        layout.addWidget(self.temp_plot,0,3,4,1)
-        layout.addWidget(self.highVac_plot,4,3,4,1)
-        layout.addWidget(self.rxnTemp_plot,8,3,4,1)
-        layout.addWidget(self.rxnVac_plot,12,3,4,1)
+        layout.addWidget(self.cryoTemp_plot_grp,0,3,4,1)
+        layout.addWidget(self.cryoVac_grp,4,3,4,1)
+        layout.addWidget(self.rxnTemp_grp,8,3,4,1)
+        layout.addWidget(self.rxnVac_grp,12,3,4,1)
 
 
-        if demoMode == True:
-            ## add fake data to tracking plots
-            i=0
-            for plt in [self.highVac_plot,self.rxnVac_plot,self.temp_plot,self.rxnTemp_plot,]:
-                # plt.setMouseEnabled(y=None)
-                if i < 2:
-                    plt.plot(y=np.random.normal(size=100),pen=self.pressurePen)
-                else:
-                    plt.plot(y=np.random.normal(size=100),pen=self.tempPen)
-                i+=1     
+        # if self.demoMode == True:
+        #     ## add fake data to tracking plots
+        #     i=0
+        #     for plt in [self.cryoVac_plot,self.rxnVac_plot,self.cryoTemp_plot,self.rxnTemp_plot]:
+        #         # plt.setMouseEnabled(y=None)
+        #         if i < 2:
+        #             plt.plot(y=np.random.normal(size=100),pen=self.pressurePen)
+        #         else:
+        #             plt.plot(y=np.random.normal(size=100),pen=self.tempPen)
+        #         i+=1     
 
 
         ## updating data with lineglow creates some issues
-        # for plt in [self.highVac_plot,self.rxnVac_plot,self.temp_plot,self.rxnTemp_plot,]:
+        # for plt in [self.cryoVac_plot,self.rxnVac_plot,self.cryoTemp_plot,self.rxnTemp_plot,]:
         #     add_line_glow(plt)  
 
 
     def abort_process(self):
         ## in practice would set flows to zero
-        self.timer.stop()
+        if self.timer is not None:
+            self.timer.stop()
+        self.logging_timer.stop()
 
 
     def setup925Gauge(self):
@@ -240,15 +248,15 @@ class MainControlWindow(qw.QMainWindow):
         if self.cp2 is not None:
             self.cp2.clear()
         
-        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#FE53BB',**{'font-size': '14pt'})
-        self.currentProcessPlot.setLabel('bottom','Time',units='s',color='#e0e0e0',**{'font-size':'14pt'})
+        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#FE53BB',**{'font-size': '12pt'})
+        self.currentProcessPlot.setLabel('bottom','Time',units='s',color='#e0e0e0',**{'font-size':'12pt'})
         ### for second trace #######
         self.cp2 = pg.ViewBox()
         self.currentProcessPlot.showAxis('right')
         self.currentProcessPlot.scene().addItem(self.cp2)
         self.currentProcessPlot.getAxis('right').linkToView(self.cp2)
         self.cp2.setXLink(self.currentProcessPlot)
-        self.currentProcessPlot.setLabel('right',"Ar Flow",units='sccm',color='#F5D300',**{'font-size':'14pt'})
+        self.currentProcessPlot.setLabel('right',"Ar Flow",units='sccm',color='#F5D300',**{'font-size':'12pt'})
 
 
         self.updateViews()
@@ -260,14 +268,10 @@ class MainControlWindow(qw.QMainWindow):
         self.sccm_Ar_trace = pg.PlotCurveItem(pen=self.flowPen)
         self.cp2.addItem(self.sccm_Ar_trace)
 
-
-
-
         self.tube_pressure_data = [0]
         self.sccm_Ar_data=[0]
         self.time_data = [0]
         self.t0 = time()
-
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update_plot_purging)
@@ -323,8 +327,8 @@ class MainControlWindow(qw.QMainWindow):
 
 
         
-        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#3f51b5',**{'font-size': '14pt'})
-        self.currentProcessPlot.setLabel('bottom',"Temperature",units='K',color='#3f51b5',**{'font-size': '14pt'})
+        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#3f51b5',**{'font-size': '12pt'})
+        self.currentProcessPlot.setLabel('bottom',"Temperature",units='K',color='#3f51b5',**{'font-size': '12pt'})
         Trange = np.linspace(180,212)
         self.calcVaporPressure = Antoine(Ah2s,Bh2s,Ch2s,Trange)
         self.calcVaporPressureTrace = self.currentProcessPlot.plot(Trange,self.calcVaporPressure,pen=pg.mkPen(color='#3f51b5',width=2))
@@ -350,6 +354,47 @@ class MainControlWindow(qw.QMainWindow):
         else:
             self.timer.stop()
 
+    def log_process(self):
+        ### this is the main function that should update plots and log file
+        self.cryoVac_trace = self.cryoVac_plot.plot(pen=self.pressurePen)
+        self.cryoTemp_trace = self.cryoTemp_plot.plot(x=[0],y=[0],pen=self.tempPen)
+        self.rxnVac_trace = self.rxnVac_plot.plot(x=[0],y=[0],pen=self.pressurePen)
+        self.rxnTemp_trace = self.rxnTemp_plot.plot(x=[0],y=[0],pen=self.tempPen)
+
+
+        self.t1 = 0
+        # self.cryoVac_trace.setData(x=[0],y=[0])
+
+        self.logging_timer = QtCore.QTimer()
+        self.logging_timer.timeout.connect(self.update_logging_plots)
+        self.logging_timer.start(1000) ## every 1 s
+
+
+    def update_logging_plots(self):
+        '''
+        When not demo mode:  
+        pressure_data = pressureplot.getData()
+        pressure_data.append(pgauge1.read())
+        pressure_trace.setData(pressure_data)
+        '''
+        if self.t1==0:
+            self.cryoVac_trace.setData(x=[0],y=[0])
+        self.t1 += 1
+        rng = np.random.default_rng()
+        xdata,ydata = self.cryoVac_trace.getData()
+        print('xdata = ',xdata)
+        print('ydata = ',ydata)
+        xdata = np.append(xdata,self.t1)
+        if self.demoMode == True:
+            ydata = np.append(ydata,750+rng.random())
+        else:
+            ydata.append(self.MKS925.readPressure())
+
+        
+        self.cryoVac_trace.setData(x=xdata,y=ydata)
+        self.cryoVac_plot.getViewBox().autoRange()
+        
+
 
 
 
@@ -359,12 +404,11 @@ class MainControlWindow(qw.QMainWindow):
         # self.new_window.show()
 
 
-class boxedPlot(qw.QWidget):
+class BoxedPlot(qw.QWidget):
     def __init__(self, plot_title, color):
         super().__init__()
         masterLayout = qw.QVBoxLayout()
         self.pen = pg.mkPen(color, width=1.25)
-
 
         layout = qw.QVBoxLayout()
         self.group = qw.QGroupBox(plot_title)
@@ -372,14 +416,14 @@ class boxedPlot(qw.QWidget):
         self.plot.getPlotItem().showGrid(x=True, y=True, alpha=1)
         if "qdarkstyle" in sys.modules:
             self.plot.setBackground((25, 35, 45))
-
+        # self.buffer = RingBuffer(capacity=bufferSize, dtype=float)
 
         self.group.setLayout(layout)
         layout.addWidget(self.plot)
         masterLayout.addWidget(self.group)
 
-
         self.setLayout(masterLayout)
+
 
 
 
