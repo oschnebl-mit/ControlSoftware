@@ -1,6 +1,7 @@
 import pyqtgraph as pg
 from pyqtgraph.parametertree import Parameter, ParameterTree
 
+
 paramChange = pg.QtCore.pyqtSignal(object,object)
 
 class CtrlParamTree(ParameterTree):
@@ -46,6 +47,7 @@ class CtrlParamTree(ParameterTree):
                 ]
         self.p = Parameter.create(name='self.params',type='group',children=self.params)
         self.setParameters(self.p,showTop=False)
+
 
         self.p.sigTreeStateChanged.connect(self.emitChange)
     
