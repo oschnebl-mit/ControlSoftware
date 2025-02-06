@@ -226,12 +226,5 @@ class MassFlowController:
 
 if __name__ == "__main__":
     rm = pyvisa.ResourceManager()
-<<<<<<< HEAD
     brooks = rm.open_resource('ASRL4::INSTR',read_termination='\r',write_termination='\r')
-=======
-    print(rm.list_resources())
-    brooks = rm.open_resource('ASRL3::INSTR',read_termination='\r',write_termination='\r')
-    print(brooks.query('AZI'))
->>>>>>> d6419e66ca2d8aa71e74ebb1ef7e25abe537b67a
-
     brooks4channel = Brooks0254(brooks, deviceAddress='29751')
