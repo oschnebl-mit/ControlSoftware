@@ -7,22 +7,25 @@ class PressureGaugeThread(QtCore.QThread):
     '''
     newData = QtCore.pyqtSignal(object)
 
-    def __init__(self,pyvisaConnection,deviceAddress=None,delay=10):
+    def __init__(self,instrument,deviceAddress=None,delay=10):
+        '''instrument is string (e.g. 'ASRL3::INSTR') and device Address is string of 5 ints
+        '''
         super().__init__()
         self.running = False
-        self.__connection: pyvisa = pyvisaConnection
+        self.delay = delay
+        self.__connection: pyvisa = pyvisa.ResourceManager().open_resource(instrument) # read/write terminations?
         self.__address: str = deviceAddress
 
         if self.__address == None:
             newaddress = self.__ask_address()
             self.__address = newaddress[7:9]
 
-    def run(self,delay):
+    def run(self):
         self.running = True
         while self.running:
             self.output = self.get_pressure()
             self.newData.emit(self.output)
-            QtCore.QThread.msleep(delay)
+            QtCore.QThread.msleep(self.delay)
 
 
     def __ask_address(self):

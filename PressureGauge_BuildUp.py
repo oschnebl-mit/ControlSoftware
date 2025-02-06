@@ -48,7 +48,7 @@ class PressureGauge:
         response = self.__connection.query(command)
         return response
 
-    def readPressure(self):
+    def get_pressure(self):
         '''NOTE: PR1 - PR4 exist, but seems like PR1-PR3 are the same, PR4 is scientific notation'''
         command = f'@{self.__address}PR1?;FF'
         response = self.__connection.query(command)
@@ -75,8 +75,9 @@ class PressureGauge:
 
 
 if __name__ == "__main__":
+    from TubeFurnaceController import GenericSerialDevice
     import serial,time
-    # pyvisa.log_to_screen() ## use log to screen when debugging serial comms
+    pyvisa.log_to_screen()
     rm = pyvisa.ResourceManager()
     print(rm.list_resources())
     rsrc = rm.open_resource('ASRL3::INSTR',read_termination = '\n')
@@ -92,7 +93,7 @@ if __name__ == "__main__":
 
     # mksgauge = PressureGauge(rsrc)
     # print(mksgauge.__ask_address())
-        # from TubeFurnaceController import GenericSerialDevice
+    
     # pgauge = GenericSerialDevice(com_port=3,parity=serial.PARITY_EVEN,testing=False,name='Temperature Controller')
     # response = pgauge.ask('@254TST!ON;FF')
     # print(response)
