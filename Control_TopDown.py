@@ -109,7 +109,7 @@ class MainControlWindow(qw.QMainWindow):
 
 
         self.purgeButton = qw.QPushButton("Fill with Ar")
-        self.stopButton = qw.QPushButton("Stop All")
+        self.stopButton = qw.QPushButton("Stop Process")
         self.purgePressureInput = qw.QLineEdit()
         self.purgePressureInput.setText('700')
         self.purgePressureInput.setValidator(QtGui.QIntValidator())
@@ -208,12 +208,12 @@ class MainControlWindow(qw.QMainWindow):
         # for plt in [self.cryoVac_plot,self.rxnVac_plot,self.cryoTemp_plot,self.rxnTemp_plot,]:
         #     add_line_glow(plt)  
 
-
+    
     def abort_process(self):
         ## in practice would set flows to zero
         if self.timer is not None:
             self.timer.stop()
-        self.logging_timer.stop()
+        # self.logging_timer.stop()
 
 
     def setup925Gauge(self):
@@ -331,12 +331,12 @@ class MainControlWindow(qw.QMainWindow):
 
 
         
-        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#3f51b5',**{'font-size': '12pt'})
-        self.currentProcessPlot.setLabel('bottom',"Temperature",units='K',color='#3f51b5',**{'font-size': '12pt'})
+        self.currentProcessPlot.setLabel('left',"Pressure",units = 'Torr',color='#9467bd',**{'font-size': '12pt'})
+        self.currentProcessPlot.setLabel('bottom',"Temperature",units='K',color='#9467bd',**{'font-size': '12pt'})
         Trange = np.linspace(180,212)
         self.calcVaporPressure = Antoine(Ah2s,Bh2s,Ch2s,Trange)
-        self.calcVaporPressureTrace = self.currentProcessPlot.plot(Trange,self.calcVaporPressure,pen=pg.mkPen(color='#3f51b5',width=2))
-        self.actualPressureTrace = pg.ScatterPlotItem(pen='#52be80',symbol='o')
+        self.calcVaporPressureTrace = self.currentProcessPlot.plot(Trange,self.calcVaporPressure,pen=pg.mkPen(color='#9467bd',width=2))
+        self.actualPressureTrace = pg.ScatterPlotItem(pen='#52be80',symbol='o',size=20)
         self.currentProcessPlot.addItem(self.actualPressureTrace)
         
         self.t0 = time()
@@ -367,7 +367,7 @@ class MainControlWindow(qw.QMainWindow):
 
         self.t1 = 0
         self.cryoVac_trace.setData(x=[time()],y=[750])
-        self.cryoTemp_trace.setData(x=[time()],y=[500])
+        self.cryoTemp_trace.setData(x=[time()],y=[100])
         self.rxnVac_trace.setData(x=[time()],y=[100])
         self.rxnTemp_trace.setData(x=[time()],y=[100])
 
@@ -388,9 +388,19 @@ class MainControlWindow(qw.QMainWindow):
             ydata = np.append(ydata,750+rng.random())
         else:
             ydata = np.append(ydata,self.MKS925.readPressure())
-
+        print('Updating plot Cryo Vacuum')
         self.cryoVac_trace.setData(x=xdata,y=ydata)
         self.cryoVac_plot.getViewBox().autoRange()
+        ## same thing for cryo temp:
+        xdata,ydata = self.cryoTemp_trace.getData()
+        xdata = np.append(xdata,time())
+        if self.demoMode == True:
+            ydata = np.append(ydata,100+2*rng.random())
+        else:
+            ydata = np.append(ydata,self.ls335.get_temperature)
+        self.cryoTemp_trace.setData(x=xdata,y=ydata)
+        self.cryoTemp_plot.getViewBox().autoRange()
+
         
 
     # def launch_tube_fill_window(self):

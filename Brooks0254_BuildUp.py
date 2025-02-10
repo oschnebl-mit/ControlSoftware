@@ -60,7 +60,19 @@ class Brooks0254:
 
     def readValue(self):
         return 0
+    
+    def closeAll(self):
+        ''' Emergency button to close all'''
+        for MFC in self.MFC_list:
+            response = MFC.valve_override(1)
+            print(response)
 
+    def resetVOR(self):
+        '''Undo the closeAll function'''
+        for MFC in self.MFC_list:
+            response = MFC.valve_override(0)
+            print(response)
+    
     '''
     Things to set up for each MFC
     - gas factor
@@ -81,25 +93,25 @@ class MassFlowController:
     TYPE_BATCH_CONTROL_STATUS = '5'
 
     ''' Note the value codes might need to be in hex'''
-    # Output_Program_Values = {
-    # 'SP_Signal_Type':'00',
-    # 'SP_Full_scale':'09',
-    # 'SP_Function':'02',
-    # 'SP_Rate':'01',
-    # 'SP_Batch':'44',
-    # 'SP_Blend':'45',
-    # 'SP_Source':'46'}
+    Output_Program_Values = {
+    'SP_Signal_Type':'00',
+    'SP_Full_scale':'09',
+    'SP_Function':'02',
+    'SP_Rate':'01',
+    'SP_Batch':'44',
+    'SP_Blend':'45',
+    'SP_Source':'46'}
 
     
-    # Input_Program_Values = {
-    #     'Measure_Units':'04',
-    #     'Time_Base':'10',
-    #     'Decimal_Point':'03',
-    #     'Gas_Factor':'27',
-    #     'Log_Type':'28',
-    #     'PV_Signal_Type':'00',
-    #     'PV_Full_Scale':'09'
-    # }
+    Input_Program_Values = {
+        'Measure_Units':'04',
+        'Time_Base':'10',
+        'Decimal_Point':'03',
+        'Gas_Factor':'27',
+        'Log_Type':'28',
+        'PV_Signal_Type':'00',
+        'PV_Full_Scale':'09'
+    }
 
     def __init__(self,channel,pyvisaConnection,deviceAddress=''):
         '''
@@ -143,7 +155,7 @@ class MassFlowController:
         '''
         command = f'AZ{self.__address}.{self.__inputPort}K'
         response = self.__connection.query(command).split(sep=',')
-        if response[2] == MFC.TYPE_RESPONSE:
+        if response[2] == MassFlowController.TYPE_RESPONSE:
             return np.float16(response[5]), np.float32(response[4]), datetime.now()
         else:
             return None
@@ -216,6 +228,19 @@ class MassFlowController:
             command = f'AZ{self.__address}.{self.__outputPort}P{pcode}?'
             response = self.__connection.query(command).split(sep=',')
             return response
+        
+    def start_batch(self,batch_volume,batch_rate):
+        ## program SP function to batch, SP Rate to desired rate, SP Batch to desired quantity, then start batch
+        self.program_output_value('SP_Function','2')
+        self.program_output_value('SP_Batch',batch_volume)
+        self.program_output_value('SP_Rate',batch_rate)
+        command = f'AZ{self.__address}.{self.__outputPort}F*' # start channel batch
+        response = self.__connection.query(command).split(sep=",")
+        return response
+    
+    def valve_override(self,value):
+        # 0 = Normal, 1 = Closed, 2 = Open
+        response = self.program_output_value('SP_VOR',value)
 
 
 # t1 = TestController(1,deviceAddress=33533)

@@ -27,8 +27,10 @@ class MainControlWindow(qw.QMainWindow):
             print('Skipping MFC initialize')
             print('Skipping pressure gauge initialize')
 
-            self.dummy = DummyThread(delay = 10)
+            self.dummy = DummyThread(delay = 1)
             self.dummy.newData.connect(self.cryoVac_grp.update_plot)
+
+            self.stopButton.clicked.connect(self.abort_processes)
         else:
             self.initThreads()
 
@@ -65,6 +67,16 @@ class MainControlWindow(qw.QMainWindow):
             self.mks925 = PressureGauge('ASRL5:INSTR')
 
             self.ls335 = Temperaturecontroller()
+
+            self.brooks0254 = Brooks0254('ASRL2:INSTR')
+
+    def abort_processes(self):
+        ## in practice would set flows to zero
+        if self.timer is not None:
+            self.timer.stop()
+        self.logging_timer.stop()
+        if not self.demoMode:
+            self.brooks0254.closeAll()
 
     def initUI(self):
         ### # Dedicated colors which look "good"
@@ -115,11 +127,17 @@ class MainControlWindow(qw.QMainWindow):
         self.doseH2SInput = qw.QLineEdit('10')
         self.doseH2SInput.setValidator(QtGui.QIntValidator())
         self.doseH2SLabel = qw.QLabel('H2S Dose Volume:')
+        self.doseH2SRateLabel = qw.QLabel('H2S Dose Rate:')
+        self.doseH2SRateInput = qw.QLineEdit('10')
+        self.doseH2SRateInput.setValidator(QtGui.QIntValidator())
 
 
         self.doseH2Input = qw.QLineEdit('10')
         self.doseH2Input.setValidator(QtGui.QIntValidator())
         self.doseH2Label = qw.QLabel('H2 Dose Volume:')
+        self.doseH2RateLabel = qw.QLabel('H2 Dose Rate:')
+        self.doseH2RateInput = qw.QLineEdit('10')
+        self.doseH2RateInput.setValidator(QtGui.QIntValidator())
 
         # self.doseH2SButton.clicked.connect(self.plotDosing)
     
@@ -143,7 +161,7 @@ class MainControlWindow(qw.QMainWindow):
 
         '''
         ## Fix the row widths to be more uniform
-        for r in range(16):
+        for r in range(24):
             layout.setRowMinimumHeight(r,1)
         
         layout.setColumnStretch(0,1)
@@ -169,10 +187,14 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.doseH2SButton,3,1,1,1)
         layout.addWidget(self.doseH2SLabel,4,1,1,1)
         layout.addWidget(self.doseH2SInput,5,1,1,1)
+        layout.addWidget(self.doseH2SRateLabel,6,1,1,1)
+        layout.addWidget(self.doseH2SRateInput,7,1,1,1)
         
-        layout.addWidget(self.doseH2Button,6,1,1,1)
-        layout.addWidget(self.doseH2Label,7,1,1,1)
-        layout.addWidget(self.doseH2Input,8,1,1,1)
+        layout.addWidget(self.doseH2Button,8,1,1,1)
+        layout.addWidget(self.doseH2Label,9,1,1,1)
+        layout.addWidget(self.doseH2Input,10,1,1,1)
+        layout.addWidget(self.doseH2RateLabel,11,1,1,1)
+        layout.addWidget(self.doseH2RateInput,12,1,1,1)
 
         layout.addWidget(self.changeTempButton,3,2,1,1)
         layout.addWidget(self.tempLabel,4,2,1,1)
@@ -180,16 +202,17 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.tempRateLabel,6,2,1,1)
         layout.addWidget(self.tempRateInput,7,2,1,1)
 
-        ## current process plot middle bottom (start at row 8, col 1)
-        layout.addWidget(self.currentProcessPlot_grp,9,1,7,2)
+        ## current process plot middle bottom (start at row 13, col 1)
+        layout.addWidget(self.currentProcessPlot_grp,13,1,11,2)
 
         ## Right Hand column of plots
-        layout.addWidget(self.cryoTemp_grp,0,3,4,1)
-        layout.addWidget(self.cryoVac_grp,4,3,4,1)
-        layout.addWidget(self.rxnTemp_grp,8,3,4,1)
-        layout.addWidget(self.rxnVac_grp,12,3,4,1)
+        layout.addWidget(self.cryoTemp_grp,0,3,6,1)
+        layout.addWidget(self.cryoVac_grp,6,3,6,1)
+        layout.addWidget(self.rxnTemp_grp,12,3,6,1)
+        layout.addWidget(self.rxnVac_grp,18,3,6,1)
 
 class BoxedPlot(qw.QWidget):
+
     def __init__(self, plot_title, color):
         super().__init__()
         masterLayout = qw.QVBoxLayout()
