@@ -1,29 +1,33 @@
 import sys,qdarkstyle
-from time import time
+import time as t
 from PyQt5 import QtGui,QtCore
 import PyQt5.QtWidgets as qw 
 import pyqtgraph as pg
 import numpy as np
+import logging
 
 from Control_Parameters import CtrlParamTree
 from Brooks0254_BuildUp import Brooks0254, MassFlowController
 from PressureGauge_BuildUp import PressureGauge
 from DummyPressureThread import DummyThread, NotAsDumbThread
+from Threads import LoggingThread, PurgeProcess
 
 class MainControlWindow(qw.QMainWindow):
-    def __init__(self, demoMode = False):
+    def __init__(self, logger,  testing = False):
+        ## Add log_path eventually
         super().__init__()
-        self.demoMode = demoMode
+        self.testing = testing
+        self.logger = logger
         self.setWindowTitle('Control Panel')
 
         # self.resize(1280,720) # non-maximized state
         self.resize(2560, 1440)  # for home monitor
-        if self.demoMode == False:
+        if self.testing == False:
             self.showMaximized()
 
         self.initUI()
 
-        if self.demoMode == True:
+        if self.testing:
             print('Skipping MFC initialize')
             print('Skipping pressure gauge initialize')
 
@@ -31,10 +35,7 @@ class MainControlWindow(qw.QMainWindow):
             # self.dummy.newData.connect(self.cryoVac_grp.update_plot)
             # self.dummy.start()
 
-            self.nadt = NotAsDumbThread(setpoint=float(self.tempInput.text()),delay=10000)
-            self.nadt.newData.connect(self.cryoTemp_grp.update_plot)
-            self.changeTempButton.clicked.connect(self.sendDemoSignal)
-            self.nadt.start()
+            self.logthread = LoggingThread(self.logger,'cryoctrl','mfcctrl','rxngauge','cryogauge',testing=self.testing)
         else:
             self.initThreads()
 
@@ -46,14 +47,21 @@ class MainControlWindow(qw.QMainWindow):
             # self.changeTempButton.clicked.connect(lambda: self.ls335.changeSetpoint(float(self.tempInput.text())))
             self.changeTempButton.clicked.connect(self.sendTempSignal)
 
-            self.mks902.newData.connect(self.cryoVac_grp.update_plot)
-            self.mks925.newData.connect(self.rxnVac_grp.update_plot)
-            self.ls335.rxnTemp.connect(self.rxnTemp_grp.update_plot)
-            self.ls335.cryoTemp.connect(self.cryoTemp_grp.update_plot)
+        ## connect logging plots, if testing the logging thread will give dummy data
+        self.logthread.new_cryo_pressure_data.connect(self.cryoVac_grp.update_plot)
+        self.logthread.new_rxn_pressure_data.connect(self.rxnVac_grp.update_plot)
+        self.logthread.new_cryo_temp_data.connect(self.cryoVac_grp.update_plot)
+        self.logthread.new_rxn_temp_data.connect(self.rxnTemp_grp.update_plot)
 
         # self.log_process()
 
         self.show()
+    
+    def handleLogging(self):
+        if self.logthread.running == False:
+            self.logthread.run()
+        else:
+            self.logthread.running = False
 
     def sendDemoSignal(self):
         # Testing out thread functon
@@ -119,6 +127,10 @@ class MainControlWindow(qw.QMainWindow):
         # self.purgeButton.clicked.connect(self.run_purge_process)
         # self.stopButton.clicked.connect(self.abort_process)
 
+        self.logButton = qw.QPushButton("Start Logging")
+        self.logButton.clicked.connect(self.handleLogging)
+        self.logButton.setCheckable(True)
+
 
         self.doseH2SButton = qw.QPushButton("Dose with H2S")
         self.doseH2Button = qw.QPushButton("Dose with H2")
@@ -134,7 +146,7 @@ class MainControlWindow(qw.QMainWindow):
 
         # self.doseH2SButton.clicked.connect(self.plotDosing)
     
-        self.tree = CtrlParamTree()
+        self.ctrlTree = CtrlParamTree()
         self.mfcButton = qw.QPushButton("Re-initialize MFCs")
         self.mks925Button = qw.QPushButton("Re-initialize MKS925 (Pirani)")
         self.mks902Button = qw.QPushButton("Re-initialize MKS902B (Piezo)")
@@ -168,11 +180,12 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.mfcButton,0,0,1,1)
         layout.addWidget(self.mks925Button,1,0,1,1)
         layout.addWidget(self.mks902Button,2,0,1,1)
-        layout.addWidget(self.tree,3,0,13,1)
+        layout.addWidget(self.ctrlTree,3,0,13,1)
 
         ## Top middle buttons and inputs (start at col 1, row 0)
         layout.addWidget(self.purgeButton,0,1,1,1)
-        layout.addWidget(self.stopButton,0,2,1,1)
+        layout.addWidget(self.stopButton, 0,2,1,1)
+        layout.addWidget(self.logButton,  1,2,1,1)
 
         layout.addWidget(self.ppiLabel,1,1,1,1)
         layout.addWidget(self.purgePressureInput,2,1,1,1)
@@ -227,8 +240,8 @@ class LoggingPlot(qw.QWidget):
         layout = qw.QVBoxLayout()
         self.group = qw.QGroupBox(plot_title)
         self.plot = pg.PlotWidget()
-        self.trace = self.plot.plot(pen=self.pen)
-        self.trace.setSkipFiniteCheck(True)
+        self.trace = self.plot.plot(x=[t.time()],y=[1],pen=self.pen)
+        # self.trace.setSkipFiniteCheck(True)
         self.plot.getPlotItem().showGrid(x=True, y=True, alpha=1)
         if "qdarkstyle" in sys.modules:
             self.plot.setBackground((25, 35, 45))
@@ -241,18 +254,21 @@ class LoggingPlot(qw.QWidget):
 
     def update_plot(self,new_data):
         xdata,ydata = self.trace.getData()
-        xdata = np.append(xdata,time())
+        xdata = np.append(xdata,t.time())
         ydata = np.append(ydata,new_data)
         self.trace.setData(x=xdata, y=ydata)
         # self.plot.getViewBox().autoRange()
 
 if __name__ == "__main__":
     # import pyvisa # if not demoMode
-
+    timestr = t.strftime('%Y%m%d-%H%M%S')
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(filename=f'CryoControlTest_{timestr}.log',level=logging.INFO)
+    logger.addHandler(logging.NullHandler())
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
 
-    window = MainControlWindow(demoMode = True)
+    window = MainControlWindow(logger = logger, testing = True)
     
     sys.exit(app.exec())
 

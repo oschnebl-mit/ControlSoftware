@@ -63,3 +63,40 @@ class CtrlParamTree(ParameterTree):
 
     def getPressureParamValue(self,branch,child):
         return self.p.param(branch,child).value()
+
+class ProcessTree(ParameterTree):
+
+    def __init__(self):
+        super().__init__()
+        self.params = [
+            {'name':'Purge Parameters','type':'group','children':{
+                {'name':'Batch Volume','type':'float','value':1},
+                {'name':'Batch Rate','type':'float','value':1},
+                {'name':'Low Pressure','type':'float','value':1},
+                {'name':'High Pressure','type':'float','value':1},
+                {'name':'No. Cycles','type':'int','value':1},
+                {'name':'Timeout (min)','type':'int','value':1},
+                {'name':'Logging Interval (s)','type':'int','value':1}
+            }},
+            {'name':'Dose H2S','type':'group','children':{
+                {'name':'Batch Volume','type':'float','value':1},
+                {'name':'Batch Rate','type':'float','value':1},
+                {'name':'Cut-off Pressure','type':'float','value':1}
+            }},
+            {'name':'Dose H2','type':'group','children':{
+                {'name':'Batch Volume','type':'float','value':1},
+                {'name':'Batch Rate','type':'float','value':1},
+                {'name':'Cut-off Pressure','type':'float','value':1}
+            }}
+        ]
+        self.p = Parameter.create(name='self.params',type='group',children=self.params)
+        self.setParameters(self.p,showTop=False)
+
+    def getPurgeValue(child):
+        return self.p.param('Purge Parameters',child).value()
+
+    def getH2SDoseValue(child):
+        return self.p.param('Dose H2S',child).value()
+
+    def getH2DoseValue(child):
+        return self.p.param('Dose H2',child).value()
