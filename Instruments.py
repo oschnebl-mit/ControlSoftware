@@ -69,63 +69,63 @@ class PressureGauge:
     Object that holds the serial communication for a pressure gauge
     '''
 
-    def __init__(self,instrument,deviceAddress=None,delay=10):
+    def __init__(self, instrument,deviceAddress=None,delay=10):
         '''instrument is string (e.g. 'ASRL3::INSTR') and device Address is string of 5 ints
         '''
-        self.__connection: pyvisa = pyvisa.ResourceManager().open_resource(instrument) # read/write terminations?
-        self.__address: str = deviceAddress
+        self._connection: pyvisa = pyvisa.ResourceManager().open_resource(instrument) # read/write terminations?
+        self._address: str = deviceAddress
 
-        if self.__address == None:
-            newaddress = self.__ask_address()
-            self.__address = newaddress[7:9]
+        if self._address == None:
+            newaddress = self._ask_address()
+            self._address = newaddress[7:9]
 
-    def __ask_address(self):
+    def _ask_address(self):
         command = f'@254AD?;FF'
-        response = self.__connection.query(command)
+        response = self._connection.query(command)
         return response
 
     def get_pressure(self):
         '''NOTE: PR1 - PR4 exist, but seems like PR1-PR3 are the same, PR4 is scientific notation'''
-        command = f'@{self.__address}PR1?;FF'
-        response = self.__connection.query(command)
+        command = f'@{self._address}PR1?;FF'
+        response = self._connection.query(command)
         if re.search('\\d*ACK',response) is not None:
             return float(response.split('ACK')[0:3])
         else:
-            print(f'Failed to receive pressure reading... Received {response}')
+            logger.warning(f'Failed to receive pressure reading... Received {response}')
             return -1
     
     def set_gauge_params(self,unit='TORR',address='254',baud_rate='9600'):
         ''' From manuals, seems to be the same for both models. I have assumed these are the only settings of interest
         Note the ! sets, while ? is for queries'''
-        response = self.__connection.query( f'@{self.__address}U!{unit};FF')
+        response = self._connection.query( f'@{self._address}U!{unit};FF')
         if re.search('\\d*ACK',response) is None:
-            print(f'Failed to set pressure unit... Received {response}')
-        response = self.__connection.query( f'@{self.__address}AD!{address};FF')
+            logger.warning(f'Failed to set pressure unit... Received {response}')
+        response = self._connection.query( f'@{self._address}AD!{address};FF')
         if re.search(f'\\d*ACK',response) is None:
-            print(f'Failed to set address... Received {response}')
+            logger.warning(f'Failed to set address... Received {response}')
         else:
-            self.__address = address ## assumes it succeded
-        response = self.__connection.query( f'@{self.__address}BR!{baud_rate};FF')
+            self._address = address ## assumes it succeded
+        response = self._connection.query( f'@{self._address}BR!{baud_rate};FF')
         if re.search("\\d*ACK",response) is None:
-            print(f'Failed to set baud rate... Received {response}')
+            logger.warning(f'Failed to set baud rate... Received {response}')
 
 
 class Brooks0254:
     '''Object that holds the pyvisa connection to Brooks0254 MFC controller and handles communication with it'''
 
-    def __init__(self, pyvisaConnection, deviceAddress=None):
+    def __init__(self, instrument, deviceAddress=None):
         '''
         pyvisaConnection = pyvisa.ResourceManager().open_resource()
         MFCs: list of str naming the gases being controlled
         deviceAddress: str of len 5
         
         '''
-        self.__connection = pyvisaConnection
-        self.__address = deviceAddress
+        self._connection = pyvisa = pyvisa.ResourceManager().open_resource(instrument)
+        self._address = deviceAddress
 
-        self.MFC1 = MassFlowController(channel=1,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
-        self.MFC2 = MassFlowController(channel=2,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
-        self.MFC3 = MassFlowController(channel=3,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
+        self.MFC1 = MassFlowController(channel=1,pyvisaConnection=self._connection,deviceAddress=self._address)
+        self.MFC2 = MassFlowController(channel=2,pyvisaConnection=self._connection,deviceAddress=self._address)
+        self.MFC3 = MassFlowController(channel=3,pyvisaConnection=self._connection,deviceAddress=self._address)
 
         self.MFC_list = [self.MFC1,self.MFC2, self.MFC3]
 
@@ -202,12 +202,12 @@ class MassFlowController:
         '''
         # Addressing parameters
         self.channel = channel
-        self.__inputPort = 2 * channel - 1
-        self.__outputPort = 2 * channel
-        self.__address: str = deviceAddress  # this is a string because it needs to be zero-padded to be 5 chars long
+        self._inputPort = 2 * channel - 1
+        self._outputPort = 2 * channel
+        self._address: str = deviceAddress  # this is a string because it needs to be zero-padded to be 5 chars long
 
         # PyVisa connection
-        self.__connection: pyvisa = pyvisaConnection
+        self._connection: pyvisa = pyvisaConnection
 
 
     def setup_MFC(self,gas_factor=1,rate_units=18,time_base=2,decimal_point=1, SP_func = 1):
@@ -232,8 +232,8 @@ class MassFlowController:
         Check for polled message type response ('4')
         Returns current process value, totalizer value, and datetime
         '''
-        command = f'AZ{self.__address}.{self.__inputPort}K'
-        response = self.__connection.query(command).split(sep=',')
+        command = f'AZ{self._address}.{self._inputPort}K'
+        response = self._connection.query(command).split(sep=',')
         if response[2] == MassFlowController.TYPE_RESPONSE:
             return np.float16(response[5]), np.float32(response[4]), datetime.now()
         else:
@@ -245,8 +245,8 @@ class MassFlowController:
          I think this should reset the totalizer.
          Response should be None
          '''
-        command = f'AZ{self.__address}.{self.__inputPort}Z1'
-        response = self.__connection.query(command).split(sep=',')
+        command = f'AZ{self._address}.{self._inputPort}Z1'
+        response = self._connection.query(command).split(sep=',')
         return response
 
     '''
@@ -259,16 +259,16 @@ class MassFlowController:
 
     def write_SP_rate(self,value):
         '''sends the command to make the setpoint rate equal to value (float)'''
-        command = f'AZ{self.__address}.{self.__outputPort}P01={value}'
-        response = self.__connection.query(command).split(sep=',')
+        command = f'AZ{self._address}.{self._outputPort}P01={value}'
+        response = self._connection.query(command).split(sep=',')
         return response
 
     def write_SP_batch(self,value):
         '''sends command to make the batch setpoint equal to value (float)
         Note that it does not start the batch (I think)
          '''
-        command = f'AZ{self.__address}.{self.__outputPort}P44={value}'
-        response = self.__connection.query(command).split(sep=',')
+        command = f'AZ{self._address}.{self._outputPort}P44={value}'
+        response = self._connection.query(command).split(sep=',')
         return response
 
     def program_output_value(self,param,value):
@@ -279,8 +279,8 @@ class MassFlowController:
             return 'Error: not an output parameter'
         else:
             pcode = Output_Program_Values[param] # this is a string
-            command = f'AZ{self.__address}.{self.__outputPort}P{pcode}={value}'
-            response = self.__connection.query(command).split(sep=',')
+            command = f'AZ{self._address}.{self._outputPort}P{pcode}={value}'
+            response = self._connection.query(command).split(sep=',')
             return response
 
     def program_input_value(self,param,value):
@@ -291,8 +291,8 @@ class MassFlowController:
             return 'Error: not an output parameter'
         else:
             pcode = Input_Program_Values[param] # this is a 2 chr string
-            command = f'AZ{self.__address}.{self.__inputPort}P{pcode}={value}'
-            response = self.__connection.query(command).split(sep=',')
+            command = f'AZ{self._address}.{self._inputPort}P{pcode}={value}'
+            response = self._connection.query(command).split(sep=',')
             return response
 
     def read_programmed_value(self,param,value):
@@ -304,8 +304,8 @@ class MassFlowController:
             return 'Error: not a parameter'
         else:
             pcode = Output_Program_Values[param] # this is a string
-            command = f'AZ{self.__address}.{self.__outputPort}P{pcode}?'
-            response = self.__connection.query(command).split(sep=',')
+            command = f'AZ{self._address}.{self._outputPort}P{pcode}?'
+            response = self._connection.query(command).split(sep=',')
             return response
         
     def start_batch(self,batch_volume,batch_rate):
@@ -313,8 +313,8 @@ class MassFlowController:
         self.program_output_value('SP_Function','2')
         self.program_output_value('SP_Batch',batch_volume)
         self.program_output_value('SP_Rate',batch_rate)
-        command = f'AZ{self.__address}.{self.__outputPort}F*' # start channel batch
-        response = self.__connection.query(command).split(sep=",")
+        command = f'AZ{self._address}.{self._outputPort}F*' # start channel batch
+        response = self._connection.query(command).split(sep=",")
         return response
     
     def valve_override(self,value):
