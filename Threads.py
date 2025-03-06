@@ -1,6 +1,7 @@
 from time import time, sleep
 from PyQt5 import QtCore
 import numpy as np
+# import pandas as pd
 
 class LoggingThread(QtCore.QThread):
     ''' Periodically asks for data from pressure gauge, furnace, and MFCS. Passes measured data and overpressure alarm to main window'''
@@ -23,6 +24,23 @@ class LoggingThread(QtCore.QThread):
             self.cryoPressure = cryoGauge
             self.mfcControl = mfcControl
 
+        elif self.testing:
+            try:
+                self.rxnPressure = rxnGauge
+                pressure = self.rxnPressure.test()
+                # self.new_rxn_pressure_data.emit(pressure)
+                # print('successfully connected to MKS902, read pressure = ', pressure)
+            except OSError as e:
+                self.logger.exception(e)
+            try:
+                self.mfcControl = mfcControl
+                flow = self.mfcControl.MFC1.get_measured_values()
+                
+                print('successfully connected to Brooks0254, read values = ', flow)
+            except OSError as e:
+                self.logger.exception(e)
+
+
         self.running = False
 
     def run(self):
@@ -39,9 +57,9 @@ class LoggingThread(QtCore.QThread):
             else:
                 [cryo_temp, rxn_temp] = self.cryoControl.get_all_kelvin_reading()
                 log_dict = {
-                    'Reaction Pressure':self.rxnGauge.getPressure(),
-                    'Cryo Pressure':self.cryoGauge.getPressure(),
-                    'Reaction Temperature':rxn_temp_temp,
+                    'Reaction Pressure':self.rxnGauge.get_pressure(),
+                    'Cryo Pressure':self.cryoGauge.get_pressure(),
+                    'Reaction Temperature':rxn_temp,
                     'Cryo Temperature':cryo_temp
                 }
                 self.new_rxn_pressure_data.emit(log_dict['Reaction Pressure'])
@@ -50,8 +68,8 @@ class LoggingThread(QtCore.QThread):
                 self.new_rxn_temp_data.emit(rxn_temp)
 
                 ## adding code to save measured values to a csv as well
-                df = pd.DataFrame([log_dict])
-                df.to_csv(self.log_path,mode='a' if self.log_path.exists() else 'w',header=not self.log_path.exists(),index=False)
+                # df = pd.DataFrame([log_dict])
+                # df.to_csv(self.log_path,mode='a' if self.log_path.exists() else 'w',header=not self.log_path.exists(),index=False)
                 ###
             QtCore.QThread.msleep(self.delay*1000)
 

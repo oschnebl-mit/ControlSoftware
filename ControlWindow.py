@@ -108,26 +108,31 @@ class MainControlWindow(qw.QMainWindow):
        ## Initialize instruments and logging thread and process thread
         if self.testing:
             try:
+                self.mks902 = PressureGauge(self.logger,'ASRL3::INSTR') ##
+            except:
+                self.mks902 = 'MKS902'
+            try:
+                self.b0254 = Brooks0254(self.logger,    'ASRL4::INSTR') ## 
+            except:
+                self.b0254 = 'Brooks0254'
+            try:
                 self.ls335 = Model335(57600)
                 self.daq = DAQ(self.logger)
-                self.mks902 = PressureGauge('ASRL3::INSTR') ##check
-                self.mks902 = PressureGauge('ASRL6::INSTR') ## check
-                self.b0254 = Brooks0254('ASRL::INSTR4') ## check
+                self.mks925 = PressureGauge('ASRL6::INSTR') ## not set yet
             except:
                 self.ls335 = 'Model335'
                 self.daq = 'DAQ'
-                self.mks902 = 'MKS902'
                 self.mks925 = 'MKS925'
-                self.b0254 = 'Brooks0254'
+
         else:
             try:
                 self.ls335 = Model335(57600)
                 self.daq = DAQ(self.logger)
-                self.mks902 = PressureGauge('ASRL3::INSTR') ##check
-                self.mks902 = PressureGauge('ASRL6::INSTR') ## check
-                self.b0254 = Brooks0254('ASRL::INSTR4') ## check
-            except Error as e:
-                logger.exception(e)
+                self.mks902 = PressureGauge('ASRL3::INSTR') 
+                self.mks925 = PressureGauge('ASRL6::INSTR') ## not set yet
+                self.b0254 = Brooks0254('ASRL4::INSTR') ## 
+            except OSError as e:
+                self.logger.exception(e)
 
         
         self.logging_thread = LoggingThread(self.logger,self.ls335,self.b0254,self.mks902,self.mks925,self.logging_delay,self.testing) 

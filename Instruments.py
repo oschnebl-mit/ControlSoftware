@@ -2,6 +2,7 @@ import re,pyvisa
 import nidaqmx
 from lakeshore import Model335
 import numpy as np
+import time
 
 class DAQ():
     '''Class for communicating with ni daq that controls relays'''
@@ -44,13 +45,13 @@ class TemperatureControl():
     Might not need this
     '''
 
-    def __init__(self,baud_rate,setpoint,ramp_rate,ramp_bool = True, loop = 1, delay = 10):
+    def __init__(self,logger,baud_rate,setpoint,ramp_rate,ramp_bool = True, loop = 1, delay = 10):
         self.temperatureController = Model335(baud_rate)
         self.setpoint = setpoint
         self.ramp_rate = ramp_rate
         self.ramp_bool = ramp_bool
         self.loop = loop 
-
+        self.logger=logger
   
     def changeSetpoint(self):
         # set_control_setpoint function takes int for which heater and float for value
@@ -69,29 +70,37 @@ class PressureGauge:
     Object that holds the serial communication for a pressure gauge
     '''
 
-    def __init__(self, instrument,deviceAddress=None,delay=10):
+    def __init__(self, logger,instrument,deviceAddress='254',delay=10):
         '''instrument is string (e.g. 'ASRL3::INSTR') and device Address is string of 5 ints
         '''
         self._connection: pyvisa = pyvisa.ResourceManager().open_resource(instrument) # read/write terminations?
         self._address: str = deviceAddress
+        self.logger = logger
 
-        if self._address == None:
-            newaddress = self._ask_address()
-            self._address = newaddress[7:9]
+        # if self._address == None:
+        #     newaddress = self._ask_address()
+        #     self._address = newaddress[7:9]
 
     def _ask_address(self):
         command = f'@254AD?;FF'
         response = self._connection.query(command)
         return response
+    
+    def test(self):
+        print("testing pressure gauge")
+        self._connection.write(f'@{self._address}TST!ON;FF')
+        time.sleep(5) # wait 10 s to see flashing
+        self._connection.write(f'@{self._address}TST!OFF;FF')
 
     def get_pressure(self):
         '''NOTE: PR1 - PR4 exist, but seems like PR1-PR3 are the same, PR4 is scientific notation'''
         command = f'@{self._address}PR1?;FF'
-        response = self._connection.query(command)
+        self._connection.write(command)
+        response = self._connection.read_bytes(12)
         if re.search('\\d*ACK',response) is not None:
             return float(response.split('ACK')[0:3])
         else:
-            logger.warning(f'Failed to receive pressure reading... Received {response}')
+            self.logger.warning(f'Failed to receive pressure reading... Received {response}')
             return -1
     
     def set_gauge_params(self,unit='TORR',address='254',baud_rate='9600'):
@@ -113,15 +122,16 @@ class PressureGauge:
 class Brooks0254:
     '''Object that holds the pyvisa connection to Brooks0254 MFC controller and handles communication with it'''
 
-    def __init__(self, instrument, deviceAddress=None):
+    def __init__(self, logger, instrument, deviceAddress='29751'):
         '''
         pyvisaConnection = pyvisa.ResourceManager().open_resource()
         MFCs: list of str naming the gases being controlled
         deviceAddress: str of len 5
         
         '''
-        self._connection = pyvisa = pyvisa.ResourceManager().open_resource(instrument)
+        self._connection = pyvisa.ResourceManager().open_resource(instrument)
         self._address = deviceAddress
+        self.logger = logger
 
         self.MFC1 = MassFlowController(channel=1,pyvisaConnection=self._connection,deviceAddress=self._address)
         self.MFC2 = MassFlowController(channel=2,pyvisaConnection=self._connection,deviceAddress=self._address)
@@ -129,8 +139,8 @@ class Brooks0254:
 
         self.MFC_list = [self.MFC1,self.MFC2, self.MFC3]
 
-        for n, MFC in enumerate(self.MFC_list,start=1):
-            MFC.setup_MFC()
+        # for n, MFC in enumerate(self.MFC_list,start=1):
+        #     MFC.setup_MFC()
     
     def setupMFCs(self,gf):
         '''Currently just sets the gas factor to a value from the parameter tree'''
@@ -235,7 +245,7 @@ class MassFlowController:
         command = f'AZ{self._address}.{self._inputPort}K'
         response = self._connection.query(command).split(sep=',')
         if response[2] == MassFlowController.TYPE_RESPONSE:
-            return np.float16(response[5]), np.float32(response[4]), datetime.now()
+            return np.float16(response[5]), np.float32(response[4]), time.time()
         else:
             return None
 

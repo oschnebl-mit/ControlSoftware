@@ -1,5 +1,5 @@
 import re, pyvisa
-
+import serial
 ''' from MKS 902B manual:
 Command syntax for an information query:
 @<device address><query>?;FF
@@ -28,6 +28,102 @@ to get pyvisa connection:
 print(rm.list_resources()) to see what's found
 pyvisa_connetion = pyvisa.ResourceManager.open_resource('ASL...INSTR',read_termination,write_termination)
 '''
+
+class GenericSerialDevice:
+    def __init__(self, logger, com_port=0, baudrate=9600, timeout=0.1, parity=serial.PARITY_NONE, bytesize=serial.EIGHTBITS,
+                 testing=False, name='serial device'):
+        self.testing = testing
+        self.max_number_of_attempts_per_read = 5
+        self.min_ms_between_successive_reads = 50
+        # self.com_lock = Lock()
+        self.com_port = com_port
+        self.serial_baudrate = baudrate
+        self.serial_timeout = timeout
+        self.serial_parity = parity
+        self.serial_bytesize = bytesize
+        self.name = name
+        self.logger = logger
+
+        self._serial_connection = self._generate_serial_connection()
+        if not self.connection_is_open():
+            self.open_connection()
+
+    def __del__(self):
+        self.close_connection()
+
+    def _generate_serial_connection(self):
+        if self.testing:
+            return None
+
+        return serial.Serial(
+            port=f'COM{self.com_port}',
+            baudrate=self.serial_baudrate,
+            timeout=self.serial_timeout,
+            parity=self.serial_parity,
+            bytesize=self.serial_bytesize
+        )
+
+    def connection_is_open(self):
+        if self.testing:
+            return False
+
+        return self._serial_connection.is_open
+
+    def open_connection(self):
+        if self.testing:
+            return
+
+        self._serial_connection.open()
+
+    def close_connection(self):
+        if self.testing:
+            return
+
+        self._serial_connection.close()
+
+    def _write(self, message_str: str):
+        if not message_str.endswith('\r'):
+            message_str = message_str + '\r'
+
+        if self.testing:
+            print(f'would write {message_str}')
+        else:
+            self._serial_connection.write(bytes(message_str, 'ascii'))
+            self.logger.debug(f'wrote {message_str} to {self.name}')
+
+    def write(self, message_str: str):
+        # with self.com_lock:
+        self._write(message_str)
+
+    def _read(self, accept_empty_response=False) -> str:
+        if self.testing:
+            return ''
+
+        for i in range(self.max_number_of_attempts_per_read):
+            time.sleep(self.min_ms_between_successive_reads / 1000)
+            response = self._serial_connection.readline()
+
+            try:
+                str_response = response.decode()
+                self.logger.debug(f'received response: {str_response} from {self.name}')
+                if accept_empty_response or (str_response != ""):
+                    return str_response  # successful read, so exit for-loop
+
+            except Exception as ex:
+                self.logger.warning(f'Read attempt {i + 1}: failed to decode response of "{response}" from {self.name}')
+                self.logger.exception(ex)
+
+        self.logger.warning(f'{self.name} failed to perform read after {self.max_number_of_attempts_per_read} tries')
+        return ""
+
+    def read(self, accept_empty_response=False) -> str:
+        # with self.com_lock:
+        return self._read(accept_empty_response)
+
+    def ask(self, message, accept_empty_response=False):
+        # with self.com_lock:
+        self._write(message)
+        return self._read(accept_empty_response)
 
 class PressureGauge:
     '''
@@ -75,44 +171,64 @@ class PressureGauge:
 
 
 if __name__ == "__main__":
-    from TubeFurnaceController import GenericSerialDevice
-    import serial,time
-    pyvisa.log_to_screen()
-    rm = pyvisa.ResourceManager()
-    print(rm.list_resources())
-    rsrc = rm.open_resource('ASRL3::INSTR',read_termination = '\n')
+    # from TubeFurnaceController import GenericSerialDevice
+    import serial,time, logging
+    # pyvisa.log_to_screen()
+    # rm = pyvisa.ResourceManager()
+    # # print(rm.list_resources())
+    # rsrc = rm.open_resource('ASRL3::INSTR',read_termination = '\n')
 
-    rsrc.write('@254TST!ON;FF')
-    print(rsrc.read_bytes(12))
-    time.sleep(1)
-    # print(rsrc.get_visa_attribute(encoding))
-    rsrc.write('@254TST!OFF;FF')
-    print(rsrc.read_bytes(12))
-    rsrc.close()
-   
+    # rsrc.write('@254TST!ON;FF')
+    # print(rsrc.read_bytes(12))
+    # time.sleep(1)
+    # # print(rsrc.get_visa_attribute(encoding))
+    # rsrc.write('@254TST!OFF;FF')
+    # print(rsrc.read_bytes(12))
+    # rsrc.write('@254AD?;FF')
+    # print(rsrc.read_bytes(12))
+    # rsrc.write('@254PR1?;FF')
+    # print(rsrc.read_bytes(12))
+    # rsrc.close()
+   ## on 3/6/2 the above pyvisa strategy is working
 
     # mksgauge = PressureGauge(rsrc)
     # print(mksgauge.__ask_address())
-    
-    # pgauge = GenericSerialDevice(com_port=3,parity=serial.PARITY_EVEN,testing=False,name='Temperature Controller')
+    # timestr = time.strftime('%Y%m%d-%H%M%S')
+    # logger = logging.getLogger(__name__)
+    # logging.basicConfig(filename=f'logs/CryoControlTest_{timestr}.log',level=logging.INFO)
+    # logger.addHandler(logging.NullHandler())
+    # pgauge = GenericSerialDevice(logger,com_port=3,parity=serial.PARITY_EVEN,testing=False,name='Temperature Controller')
     # response = pgauge.ask('@254TST!ON;FF')
     # print(response)
+    # time.sleep(2)
+    # response = pgauge.ask('@254TST!OFF;FF')
+    # print(response)
+    # response = pgauge.ask('@254PR1?;FF')
+    # print(response)
     # pgauge.close_connection()
+## on 3/6/2 the above gneeric serial device strategy is not working
 
-    # ser = serial.Serial(
-    #     port="COM3", baudrate = 9600,
-    #     parity=serial.PARITY_NONE,
-    #     bytesize=8,stopbits=serial.STOPBITS_ONE, timeout=1)
-    # if ser.isOpen():
-    #     print(ser.name + ' is open...')
-    #     # for j in range(2):
-    #     #     print(ser.readline())
-    # ## Write ASCII Commands To TSI 4043 Flow Sensor
-    # ser.write(b'@253PR1?;FF') # test mode (flashes LED)  
+    ser = serial.Serial(
+        port="COM3", baudrate = 9600,
+        parity=serial.PARITY_NONE,
+        bytesize=8,stopbits=serial.STOPBITS_ONE, timeout=1)
+    if ser.isOpen():
+        print(ser.name + ' is open...')
+        # for j in range(2):
+        #     print(ser.readline())
+    ## Write ASCII Commands To TSI 4043 Flow Sensor
+    ser.write(b'@253AD?;FF') # test mode (flashes LED)  
     
-    # for n in range(3):
-    #     rsp = ser.readline()
-    #     print(rsp)
-    #     print(rsp.decode())
+    for n in range(3):
+        rsp = ser.readline()
+        print(rsp)
+        print(rsp.decode())
 
-    # ser.close()
+    ser.close()
+ ## on 3/6/25 the above returned 
+    #     COM3 is open...
+    # b'@253ACK736.0;FF'
+    # @253ACK736.0;FF
+    # b''
+
+    # b''
