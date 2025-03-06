@@ -149,7 +149,7 @@ class MainControlWindow(qw.QMainWindow):
         for r in range(16):
             layout.setRowMinimumHeight(r,1)
         
-        layout.setColumnStretch(0,1)
+        layout.setColumnStretch(0,2)
         layout.setColumnStretch(1,2)
         layout.setColumnStretch(2,2)
         layout.setColumnStretch(3,3)
@@ -388,7 +388,7 @@ class MainControlWindow(qw.QMainWindow):
             ydata = np.append(ydata,750+rng.random())
         else:
             ydata = np.append(ydata,self.MKS925.readPressure())
-        print('Updating plot Cryo Vacuum')
+        # print('Updating plot Cryo Vacuum')
         self.cryoVac_trace.setData(x=xdata,y=ydata)
         self.cryoVac_plot.getViewBox().autoRange()
         ## same thing for cryo temp:
@@ -471,10 +471,9 @@ class LoggingPlot(qw.QWidget):
 
 if __name__ == "__main__":
     app = qw.QApplication(sys.argv)
-    app.setStyleSheet(qdarkstyle.load_stylesheet())
-
+    if "qdarkstyle" in sys.modules:
+        app.setStyleSheet(qdarkstyle.load_stylesheet())
 
     window = MainControlWindow(demoMode = True)
-
 
     sys.exit(app.exec())

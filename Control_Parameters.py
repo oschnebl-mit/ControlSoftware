@@ -10,25 +10,25 @@ class CtrlParamTree(ParameterTree):
         self.params = [
             {'name':'MFC Setup Parameters', 'type':'group','children':[
                 {'name':'MFC 1 Setup Parameters', 'type':'group','children':[
-                {'name':'Gas Factor','type':'float','value':1.0},
+                {'name':'Gas Factor','type':'float','value':1.39},
                 {'name':'Rate Units','type':'int','value':18},
-                {'name':'Time Base','type':'int','value':2},
+                {'name':'Time Base','type':'list','limits':['sec','min','hrs','day']},
                 {'name':'Decimal Point','type':'int','value':1},
-                {'name':'SP Function','type':'int','value':1}
+                {'name':'SP Function','type':'list','limits':['RATE','BATCH']}
                 ]},
                 {'name':'MFC 2 Setup Parameters', 'type':'group','children':[
-                {'name':'Gas Factor','type':'float','value':1.3},
+                {'name':'Gas Factor','type':'float','value':1.0},
                 {'name':'Rate Units','type':'int','value':18},
-                {'name':'Time Base','type':'int','value':2},
+                {'name':'Time Base','type':'list','limits':['sec','min','hrs','day']},
                 {'name':'Decimal Point','type':'int','value':1},
-                {'name':'SP Function','type':'int','value':1}
+                {'name':'SP Function','type':'list','limits':['RATE','BATCH']}
                 ]},
                 {'name':'MFC 3 Setup Parameters', 'type':'group','children':[
-                {'name':'Gas Factor','type':'float','value':1.1},
+                {'name':'Gas Factor','type':'float','value':0.84},
                 {'name':'Rate Units','type':'int','value':18},
-                {'name':'Time Base','type':'int','value':2},
+                {'name':'Time Base','type':'list','limits':['sec','min','hrs','day']},
                 {'name':'Decimal Point','type':'int','value':1},
-                {'name':'SP Function','type':'int','value':1}
+                {'name':'SP Function','type':'list','limits':['RATE','BATCH']}
                 ]},
                 {'name':'Visa Resource','type':'str','value':'ASRL4::INSTR'},
                 {'name':'Device Address','type':'str','value':'29751'}
