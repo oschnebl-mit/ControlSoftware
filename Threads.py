@@ -30,14 +30,14 @@ class LoggingThread(QtCore.QThread):
                 pressure = self.rxnPressure.test()
                 # self.new_rxn_pressure_data.emit(pressure)
                 # print('successfully connected to MKS902, read pressure = ', pressure)
-            except OSError as e:
+            except (OSError, AttributeError) as e:
                 self.logger.exception(e)
             try:
                 self.mfcControl = mfcControl
                 flow = self.mfcControl.MFC1.get_measured_values()
                 
                 print('successfully connected to Brooks0254, read values = ', flow)
-            except OSError as e:
+            except (OSError,AttributeError) as e:
                 self.logger.exception(e)
 
 

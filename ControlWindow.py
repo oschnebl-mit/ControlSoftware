@@ -12,7 +12,7 @@ from Control_Parameters import CtrlParamTree, ProcessTree
 from DummyPressureThread import DummyThread, NotAsDumbThread
 from Threads import LoggingThread, PurgeThread, DoseThread
 from Instruments import PressureGauge, DAQ, Brooks0254
-from lakeshore import Model335
+# from lakeshore import Model335
 
 class MainControlWindow(qw.QMainWindow):
     def __init__(self, logger, testing = False):
@@ -35,9 +35,7 @@ class MainControlWindow(qw.QMainWindow):
 
 
         if self.testing:
-            print('Skipping MFC initialize')
-            print('Skipping pressure gauge initialize')
-
+    
             # self.dummy = DummyThread(delay = 3000)
             # self.dummy.newData.connect(self.cryoVac_grp.update_plot)
             # self.dummy.start()
@@ -60,25 +58,28 @@ class MainControlWindow(qw.QMainWindow):
         self.logging_thread.new_cryo_temp_data.connect(self.cryoTemp_grp.update_plot)
         self.logging_thread.new_rxn_temp_data.connect(self.rxnTemp_grp.update_plot)
 
-        self.logButton.clicked.connect(self.logging_thread.start)
-        self.stop_log_button.clicked.connect(self.stop_logging)
+        self.logButton.clicked.connect(self.toggle_logging)
+        # self.stop_log_button.clicked.connect(self.stop_logging)
         self.purgeButton.clicked.connect(self.runPurge)
         self.abortButton.clicked.connect(self.abortAll)
         self.doseH2SButton.clicked.connect(self.runH2SDose)
         
         self.show()
-    def stop_logging(self):
-        self.logging_thread.running = False
+    # def stop_logging(self):
+    #     self.logging_thread.running = False
 
-    def handleLogging(self):
-        if self.logging_thread.running == False:
-        # if self.logButton.isChecked == False: # not sure which one (or both?) to use as condition
-            self.logging_thread.running = True
-        else:
+    def toggle_logging(self):
+        if self.logging_thread.running:
             self.logging_thread.running = False
+            print('pause logging')
+        else:
+            print('start logging')
+            self.logging_thread.start()
+
     def updateLogInterval(self):
         self.logging_delay = int(self.logInput.text())
         self.logging_thread.delay = self.logging_delay
+        print(f'Updating log interval to {self.logging_delay}s')
 
     def sendDemoSignal(self):
         # Testing out thread functon
@@ -106,21 +107,27 @@ class MainControlWindow(qw.QMainWindow):
 
     def initThreads(self):
        ## Initialize instruments and logging thread and process thread
+       ## If testing, don't error out if failed to make connections
         if self.testing:
             try:
                 self.mks902 = PressureGauge(self.logger,'ASRL3::INSTR') ##
             except:
                 self.mks902 = 'MKS902'
+                print("Failed to connect to MKS902 gauge.")
             try:
                 self.b0254 = Brooks0254(self.logger,    'ASRL4::INSTR') ## 
             except:
                 self.b0254 = 'Brooks0254'
+                print("Failed to connect to Brooks0254 MFC controller.")
             try:
                 self.ls335 = Model335(57600)
+            except:
+                self.ls335 = 'Model335'
+                print("Failed to connect to Lakeshore cryo controller")
+            try:
                 self.daq = DAQ(self.logger)
                 self.mks925 = PressureGauge('ASRL6::INSTR') ## not set yet
             except:
-                self.ls335 = 'Model335'
                 self.daq = 'DAQ'
                 self.mks925 = 'MKS925'
 
@@ -236,10 +243,10 @@ class MainControlWindow(qw.QMainWindow):
         ## TODO: write function to update interval when this value changes
         self.logLabel = qw.QLabel('Logging Interval (s):')
         self.logButton = qw.QPushButton("Start Logging")
-        self.stop_log_button = qw.QPushButton("Stop Logging")
+        # self.stop_log_button = qw.QPushButton("Stop Logging")
         
         # self.logButton.clicked.connect(self.handleLogging)
-        # self.logButton.setCheckable(True)
+        self.logButton.setCheckable(True)
         # self.logButton.setChecked(False)
 
         self.doseH2SButton = qw.QPushButton("Dose with H2S")
@@ -285,11 +292,12 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.logInput,        1,2,1,1)
 
         layout.addWidget(self.logButton,       2,2,1,1)
-        layout.addWidget(self.stop_log_button, 3,2,1,1)
+        # layout.addWidget(self.stop_log_button, 3,2,1,1)
+        layout.addWidget(self.abortButton,     3,2,1,1)
         layout.addWidget(self.purgeButton,     4,2,1,1)
         layout.addWidget(self.doseH2SButton,   5,2,1,1)
         layout.addWidget(self.doseH2Button,    6,2,1,1)
-        layout.addWidget(self.abortButton,     7,2,1,1)
+        # layout.addWidget(self.abortButton,     7,2,1,1)
 
         ## current process plot middle bottom (start at row 8, col 1)
         layout.addWidget(self.currentProcessPlot_grp,9,1,7,2)
@@ -349,10 +357,11 @@ class LoggingPlot(qw.QWidget):
         layout = qw.QVBoxLayout()
         self.group = qw.QGroupBox(plot_title)
         self.plot = pg.PlotWidget()
-        self.trace = pg.PlotCurveItem(pen=self.pen)
+        # self.trace = pg.PlotCurveItem(pen=self.pen)
+        self.trace = pg.PlotDataItem(pen=self.pen,symbol='o') ## trying this to have points and lines
         self.plot.addItem(self.trace)
         # self.trace.setSkipFiniteCheck(True)
-        self.plot.getPlotItem().showGrid(x=True, y=True, alpha=1)
+        self.plot.getPlotItem().showGrid(x=True, y=True, alpha=0.5)
         if "qdarkstyle" in sys.modules:
             self.plot.setBackground((25, 35, 45))
 
@@ -364,9 +373,14 @@ class LoggingPlot(qw.QWidget):
 
     def update_plot(self,new_data):
         xdata,ydata = self.trace.getData()
-        # print(xdata,ydata)
-        xdata = np.append(xdata,t.time())
-        ydata = np.append(ydata,new_data)
+        print(xdata,ydata)
+        if xdata is None:
+            xdata = np.array([t.time()])
+            ydata = np.array([new_data])
+        else:
+            xdata = np.append(xdata,t.time())
+            ydata = np.append(ydata,new_data)
+        print(xdata,ydata)
         self.trace.setData(x=xdata, y=ydata)
         # self.plot.getViewBox().autoRange()
 
