@@ -27,7 +27,8 @@ class LoggingThread(QtCore.QThread):
         elif self.testing:
             try:
                 self.rxnPressure = rxnGauge
-                pressure = self.rxnPressure.test()
+                self.rxnPressure.test()
+                # pressure = self.rxnPressure.get_pressure()
                 # self.new_rxn_pressure_data.emit(pressure)
                 # print('successfully connected to MKS902, read pressure = ', pressure)
             except (OSError, AttributeError) as e:
@@ -37,6 +38,14 @@ class LoggingThread(QtCore.QThread):
                 flow = self.mfcControl.MFC1.get_measured_values()
                 
                 print('successfully connected to Brooks0254, read values = ', flow)
+            except (OSError,AttributeError) as e:
+                self.logger.exception(e)
+            
+            try:
+                self.cryoControl = cryoControl
+                [cryo_temp,rxn_temp] = self.cryoControl.get_all_kelvin_reading()
+                self.new_cryo_temp_data.emit(cryo_temp)
+                print(f'Successfully connected to Lakeshore 335. Read temp {cryo_temp}')
             except (OSError,AttributeError) as e:
                 self.logger.exception(e)
 

@@ -123,13 +123,14 @@ class MainControlWindow(qw.QMainWindow):
                 self.ls335 = Model335(57600)
             except:
                 self.ls335 = 'Model335'
-                print("Failed to connect to Lakeshore cryo controller")
+                print("Failed to connect to Lakeshore cryo controller.")
             try:
                 self.daq = DAQ(self.logger)
                 self.mks925 = PressureGauge('ASRL6::INSTR') ## not set yet
             except:
                 self.daq = 'DAQ'
                 self.mks925 = 'MKS925'
+                print("Failed to connectot MKS925, DAQ.")
 
         else:
             try:
@@ -154,7 +155,7 @@ class MainControlWindow(qw.QMainWindow):
         self.currentProcessPlot.clear() #only needed if not the first run
         self.currentProcessPlot_grp.group.setTitle("Purge Process") # use class func for QGroupBox
         self.currentProcessPlot.setLabel('left','Pressure', units='Torr')
-        self.currentProcessPlot_grp.trace = pg.PlotCurveItem(pen=self.pressurePen,symbol='o')
+        self.currentProcessPlot_grp.trace = pg.PlotCurveItem(pen=self.pressurePen,symbol='o',color='#08F7FE')
         self.currentProcessPlot.addItem(self.currentProcessPlot_grp.trace)
         self.purge_thread.new_pressure.connect(self.currentProcessPlot_grp.update_plot)
         self.purge_thread.message.connect(self.currentProcessPlot_grp.message.setText)
@@ -353,12 +354,13 @@ class LoggingPlot(qw.QWidget):
     def __init__(self, plot_title, color):
         super().__init__()
         masterLayout = qw.QVBoxLayout()
-        self.pen = pg.mkPen(color, width=2)
+        self.pen = pg.mkPen(color, width=1)
+        self.brush = pg.mkBrush(color)
         layout = qw.QVBoxLayout()
         self.group = qw.QGroupBox(plot_title)
         self.plot = pg.PlotWidget()
         # self.trace = pg.PlotCurveItem(pen=self.pen)
-        self.trace = pg.PlotDataItem(pen=self.pen,symbol='o') ## trying this to have points and lines
+        self.trace = pg.PlotDataItem(pen=self.pen,symbol='o',symbolBrush=self.brush) ## trying this to have points and lines
         self.plot.addItem(self.trace)
         # self.trace.setSkipFiniteCheck(True)
         self.plot.getPlotItem().showGrid(x=True, y=True, alpha=0.5)
