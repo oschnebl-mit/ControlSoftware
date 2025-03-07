@@ -12,7 +12,7 @@ from Control_Parameters import CtrlParamTree, ProcessTree
 from DummyPressureThread import DummyThread, NotAsDumbThread
 from Threads import LoggingThread, PurgeThread, DoseThread
 from Instruments import PressureGauge, DAQ, Brooks0254
-# from lakeshore import Model335
+from lakeshore import Model335
 
 class MainControlWindow(qw.QMainWindow):
     def __init__(self, logger, testing = False):
@@ -50,7 +50,6 @@ class MainControlWindow(qw.QMainWindow):
             self.mks925Button.clicked.connect(self.mks902.setupGauge)
             self.mks902Button.clicked.connect(self.mks925.setupGauge)
             # self.changeTempButton.clicked.connect(lambda: self.ls335.changeSetpoint(float(self.tempInput.text())))
-            self.changeTempButton.clicked.connect(self.sendTempSignal)
 
         ## connect logging plots, if testing the logging thread will give dummy data
         self.logging_thread.new_cryo_pressure_data.connect(self.cryoVac_grp.update_plot)
@@ -86,12 +85,12 @@ class MainControlWindow(qw.QMainWindow):
         self.nadt.setpoint = float(self.tempInput.text())
         self.nadt.updateCryoSetpoint()
 
-    def sendTempSignal(self):
-        ## reads setpoint from the line edit input box, then uses the wrapper function to pass that value to the controller
-        self.ls335.setpoint = float(self.tempInput.text())
-        self.ls335.ramp_rate = float(self.tempRampInput.text())
-        self.ls335.changeSetpoint()
-        self.ls335.changeRamp()
+    # def sendTempSignal(self):
+    #     ## reads setpoint from the line edit input box, then uses the wrapper function to pass that value to the controller
+    #     self.ls335.setpoint = float(self.tempInput.text())
+    #     self.ls335.ramp_rate = float(self.tempRampInput.text())
+    #     self.ls335.changeSetpoint()
+    #     self.ls335.changeRamp()
 
     def abortAll(self):
         ## Stop all processes (except logging) and close all valves
@@ -121,6 +120,7 @@ class MainControlWindow(qw.QMainWindow):
                 print("Failed to connect to Brooks0254 MFC controller.")
             try:
                 self.ls335 = Model335(57600)
+                self.setCryoButton.clicked.connect(self.change_cryo())
             except:
                 self.ls335 = 'Model335'
                 print("Failed to connect to Lakeshore cryo controller.")
@@ -130,7 +130,7 @@ class MainControlWindow(qw.QMainWindow):
             except:
                 self.daq = 'DAQ'
                 self.mks925 = 'MKS925'
-                print("Failed to connectot MKS925, DAQ.")
+                print("Failed to connect to MKS925, DAQ.")
 
         else:
             try:
@@ -139,6 +139,8 @@ class MainControlWindow(qw.QMainWindow):
                 self.mks902 = PressureGauge('ASRL3::INSTR') 
                 self.mks925 = PressureGauge('ASRL6::INSTR') ## not set yet
                 self.b0254 = Brooks0254('ASRL4::INSTR') ## 
+
+                self.setCryoButton.clicked.connect(self.change_cryo())
             except OSError as e:
                 self.logger.exception(e)
 
@@ -204,6 +206,15 @@ class MainControlWindow(qw.QMainWindow):
         self.currentProcessPlot_grp.message.setText('Dose process finished')
         self.dose_thread.running = False
 
+    def change_cryo(self):
+        loop = self.processTree.getCryoValue('Control Loop')
+        ramp_enable = self.processTree.getCryoValue('Control Loop')
+        ramp_rate = self.processTree.getCryoValue('Ramp Rate (K/min)')
+        setpoint = self.processTree.getCryoValue('Setpoint (K)')
+        self.ls335.set_setpoint_ramp_parameter(loop,ramp_enable,ramp_rate)
+        self.ls335.set_control_setpoint(loop, setpoint)
+        self.logger.info(f'Setting cryostat loop {loop} to {setpoint} K at rate of {ramp_rate} K/min')
+
     def initUI(self):
         ### # Dedicated colors which look "good"
         # colors = ['#08F7FE', '#FE53BB', '#F5D300', '#00ff41', '#FF0000', '#9467bd', ]
@@ -262,7 +273,7 @@ class MainControlWindow(qw.QMainWindow):
 
         self.processTree = ProcessTree()
 
-        
+        self.setCryoButton = qw.QPushButton("Change Cryo Setpoint")
         '''
         Some notes on the grid layout: 
         Because the buttons are small relative to the plots, the plots span many rows
@@ -270,7 +281,7 @@ class MainControlWindow(qw.QMainWindow):
 
         '''
         ## Fix the row widths to be more uniform
-        for r in range(16):
+        for r in range(21):
             layout.setRowMinimumHeight(r,1)
         
         layout.setColumnStretch(0,1)
@@ -287,7 +298,7 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.ctrlTree,        3,0,13,1)
 
         ## Top middle buttons and inputs (start at col 1, row 0)
-        layout.addWidget(self.processTree,     0,1,8,1)
+        layout.addWidget(self.processTree,     0,1,10,1)
 
         layout.addWidget(self.logLabel,        0,2,1,1)
         layout.addWidget(self.logInput,        1,2,1,1)
@@ -299,15 +310,16 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.doseH2SButton,   5,2,1,1)
         layout.addWidget(self.doseH2Button,    6,2,1,1)
         # layout.addWidget(self.abortButton,     7,2,1,1)
+        layout.addWidget(self.setCryoButton,   7,2,1,1)
 
         ## current process plot middle bottom (start at row 8, col 1)
-        layout.addWidget(self.currentProcessPlot_grp,9,1,7,2)
+        layout.addWidget(self.currentProcessPlot_grp,10,1,10,2)
 
         ## Right Hand column of plots
-        layout.addWidget(self.cryoTemp_grp,0,3,4,1)
-        layout.addWidget(self.cryoVac_grp,4,3,4,1)
-        layout.addWidget(self.rxnTemp_grp,8,3,4,1)
-        layout.addWidget(self.rxnVac_grp,12,3,4,1)
+        layout.addWidget(self.cryoTemp_grp,    0, 3,5,1)
+        layout.addWidget(self.cryoVac_grp,     5, 3,5,1)
+        layout.addWidget(self.rxnTemp_grp,     10,3,5,1)
+        layout.addWidget(self.rxnVac_grp,      15,3,5,1)
 
 
 class BoxedPlot(qw.QWidget):
