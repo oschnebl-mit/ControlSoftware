@@ -44,12 +44,37 @@ class CtrlParamTree(ParameterTree):
                     {'name':'Address','type':'str','value':'254'},
                     {'name':'Baud Rate','type':'list','limits':['4800','9600','19200','38400','57600','115200','230400'],'value':'9600'}
                 ]}
+                #  {'name':'Lakeshore 335 Setup Parameters','type':'group','children':[
+                #    ## don't want to give unneeded options, maybe control mode?
+                # ]}
                 ]
         self.p = Parameter.create(name='self.params',type='group',children=self.params)
         self.setParameters(self.p,showTop=False)
-
-
+        
         self.p.sigTreeStateChanged.connect(self.emitChange)
+    '''
+    FROM LAKESHORE DRIVER:
+    def set_heater_pid(self, output, gain, integral, derivative):
+            """Configure the closed loop control parameters of the heater output.
+
+                Args:
+                    output (int):
+                        Specifies which output's control loop to configure.
+                    gain (float):
+                        Proportional term in PID control.
+                        This controls how strongly the control output reacts to the present error.
+                    integral (float):
+                        Integral term in PID control.
+                        This controls how strongly the control output reacts to the past error history.
+                    derivative (float):
+                        Derivative term in PID control.
+                        This value controls how quickly the present field set point will transition to a new set-point.
+                        The ramp rate is configured in field units per second.
+
+            """
+            self.command(f"PID {output},{gain},{integral},{derivative}")
+    '''
+
     
     def emitChange(self,param,changes):
         self.paramChange.emit(param,changes)
@@ -87,11 +112,35 @@ class ProcessTree(ParameterTree):
                 {'name':'Batch Volume','type':'float','value':1},
                 {'name':'Batch Rate','type':'float','value':1},
                 {'name':'Cut-off Pressure','type':'float','value':1}
-        ]}
+        ]},
+            {'name':'Cryo Setpoint','type':'group','children':[
+                {'name':'Control Loop','type':'int','value':1},
+                {'name':'Ramp Enable','type':'bool','value':True},
+                {'name':'Ramp Rate (K/min)','type':'float','value':2},
+                {'name':'Setpoint (K)','type':'float','value':300}
+            ]}
         ]
         self.p = Parameter.create(name='self.params',type='group',children=self.params)
         self.setParameters(self.p,showTop=False)
+    '''
+      
+        def set_setpoint_ramp_parameter(self, output, ramp_enable, rate_value):
+        """Sets the control loop of a particular output.
 
+            Args:
+                output (int):
+                    Specifies which output's control loop to configure.
+                ramp_enable (bool):
+                    Specifies whether ramping is off or on (False = Off or True = On).
+                rate_value (float):
+                    Specifies set-point ramp rate in kelvin per minute.
+                    The rate is always positive but will respond to ramps up or down.
+                    A rate of 0 is interpreted as infinite, and will respond as if set-point ramping were off.
+                    (0.1 to 100)
+
+        """
+        self.command(f"RAMP {output},{int(ramp_enable)},{rate_value}")
+     '''
     def getPurgeValue(self,child):
         return self.p.param('Purge Parameters',child).value()
 
@@ -100,3 +149,6 @@ class ProcessTree(ParameterTree):
 
     def getH2DoseValue(self,child):
         return self.p.param('Dose H2',child).value()
+    
+    def getCryoValue(self,child):
+        return self.p.param('Cryo Setpoint',child).value()
