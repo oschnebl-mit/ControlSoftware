@@ -47,8 +47,8 @@ class MainControlWindow(qw.QMainWindow):
 
            ## connect UI items to running functions
             self.mfcButton.clicked.connect(self.setupMFCs)
-            self.mks925Button.clicked.connect(self.mks902.setupGauge)
-            self.mks902Button.clicked.connect(self.mks925.setupGauge)
+            self.mks925Button.clicked.connect(self.setupMKS925)
+            self.mks902Button.clicked.connect(self.setupMKS902)
             # self.changeTempButton.clicked.connect(lambda: self.ls335.changeSetpoint(float(self.tempInput.text())))
 
         ## connect logging plots, if testing the logging thread will give dummy data
@@ -80,18 +80,6 @@ class MainControlWindow(qw.QMainWindow):
         self.logging_thread.delay = self.logging_delay
         print(f'Updating log interval to {self.logging_delay}s')
 
-    def sendDemoSignal(self):
-        # Testing out thread functon
-        self.nadt.setpoint = float(self.tempInput.text())
-        self.nadt.updateCryoSetpoint()
-
-    # def sendTempSignal(self):
-    #     ## reads setpoint from the line edit input box, then uses the wrapper function to pass that value to the controller
-    #     self.ls335.setpoint = float(self.tempInput.text())
-    #     self.ls335.ramp_rate = float(self.tempRampInput.text())
-    #     self.ls335.changeSetpoint()
-    #     self.ls335.changeRamp()
-
     def abortAll(self):
         ## Stop all processes (except logging) and close all valves
         ## any other safety things? change cryo?
@@ -115,12 +103,13 @@ class MainControlWindow(qw.QMainWindow):
                 print("Failed to connect to MKS902 gauge.")
             try:
                 self.b0254 = Brooks0254(self.logger,    'ASRL4::INSTR') ## 
+                self.mfcButton.clicked.connect(self.setupMFCs)
             except:
                 self.b0254 = 'Brooks0254'
                 print("Failed to connect to Brooks0254 MFC controller.")
             try:
                 self.ls335 = Model335(57600)
-                self.setCryoButton.clicked.connect(self.change_cryo())
+                self.setCryoButton.clicked.connect(self.change_cryo)
             except:
                 self.ls335 = 'Model335'
                 print("Failed to connect to Lakeshore cryo controller.")
@@ -214,6 +203,37 @@ class MainControlWindow(qw.QMainWindow):
         self.ls335.set_setpoint_ramp_parameter(loop,ramp_enable,ramp_rate)
         self.ls335.set_control_setpoint(loop, setpoint)
         self.logger.info(f'Setting cryostat loop {loop} to {setpoint} K at rate of {ramp_rate} K/min')
+
+    
+    def sendDemoSignal(self):
+        # Testing out thread functon
+        self.nadt.setpoint = float(self.tempInput.text())
+        self.nadt.updateCryoSetpoint()
+
+    def setupMKS925(self):
+        ## function intended to troubleshoot connection to pressure gauge from within gui
+        unit = self.ctrlTree.getPressureParamValue('MKS 925 Setup Parameters','Pressure unit')
+        addr = self.ctrlTree.getPressureParamValue('MKS 925 Setup Parameters','Address')
+        baud = self.ctrlTree.getPressureParamValue('MKS 925 Setup Parameters','Baud Rate')
+        self.logger.debug(f'Setting MKS925 gauge to new parameters: {unit},{addr},{baud}')
+        self.mks925.set_gauge_params(unit,addr,baud)
+
+    def setupMKS902(self):
+        ## function intended to troubleshoot connection to pressure gauge from within gui
+        unit = self.ctrlTree.getPressureParamValue('MKS 902B Setup Parameters','Pressure unit')
+        addr = self.ctrlTree.getPressureParamValue('MKS 902B Setup Parameters','Address')
+        baud = self.ctrlTree.getPressureParamValue('MKS 902B Setup Parameters','Baud Rate')
+        self.logger.debug(f'Setting MKS902B gauge to new parameters: {unit},{addr},{baud}')
+        self.mks902.set_gauge_params(unit,addr,baud)
+
+    def setupMFCs(self):
+        for i in range(3):
+            gas_factor = self.ctrlTree.getMFCParamValue(i+1,'Gas Factor')
+            rate_units = self.ctrlTree.getMFCParamValue(i+1,'Rate Units')
+            time_base = self.ctrlTree.getMFCParamValue(i+1,'Time Base')
+            decimal_point = self.ctrlTree.getMFCParamValue(i+1,'Decimal Point')
+            func = self.ctrlTree.getMFCParamValue(i+1,'SP Function')
+            self.b0254.MFC_list[i].setup_MFC(gas_factor,rate_units,time_base,decimal_point,func)
 
     def initUI(self):
         ### # Dedicated colors which look "good"
@@ -403,7 +423,7 @@ if __name__ == "__main__":
     # import pyvisa # if not demoMode
     timestr = t.strftime('%Y%m%d-%H%M%S')
     logger = logging.getLogger(__name__)
-    logging.basicConfig(filename=f'logs/CryoControlTest_{timestr}.log',level=logging.INFO)
+    logging.basicConfig(filename=f'logs/CryoControlTest_{timestr}.log',level=logging.DEBUG)
     logger.addHandler(logging.NullHandler())
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
