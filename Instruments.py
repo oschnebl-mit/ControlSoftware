@@ -20,19 +20,19 @@ class DAQ():
         logger.info('Initialized relays at "Dev1/port0/line0" and "Dev1/port0/line1"')
 
     def open_relay1(self):
-        logger.info('Write True at relay 1 to open')
+        self.logger.info('Write True at relay 1 to open')
         self.relay1.write(True)
     
     def close_relay1(self):
-        logger.info('Write False at relay 1 to close')
+        self.logger.info('Write False at relay 1 to close')
         self.relay1.write(False)
 
     def open_relay2(self):
-        logger.info('Write True at relay 2 to open')
+        self.logger.info('Write True at relay 2 to open')
         self.relay2.write(True)
     
     def close_relay2(self):
-        logger.info('Write False at relay 2 to close')
+        self.logger.info('Write False at relay 2 to close')
         self.relay2.write(False)
 
 ''' Lakeshore docs on this specific model's python driver: https://lake-shore-python-driver.readthedocs.io/en/latest/model_335.html
@@ -126,7 +126,7 @@ class PressureGauge:
     def get_pressure(self):
         '''NOTE: PR1 - PR4 exist, but seems like PR1-PR3 are the same, PR4 is scientific notation'''
         command = f'@{self._address}PR1?;FF'
-        response = self.query(command)
+        response = self.query(command).decode()
         if re.search('\\d*ACK',response) is not None:
             list = response.split('ACK')
             value = list[1]

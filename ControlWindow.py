@@ -97,7 +97,7 @@ class MainControlWindow(qw.QMainWindow):
        ## If testing, don't error out if failed to make connections
         if self.testing:
             try:
-                self.mks902 = PressureGauge(self.logger,'ASRL3::INSTR') ##
+                self.mks902 = PressureGauge(self.logger,'COM3') ##
             except:
                 self.mks902 = 'MKS902'
                 print("Failed to connect to MKS902 gauge.")
@@ -115,11 +115,14 @@ class MainControlWindow(qw.QMainWindow):
                 print("Failed to connect to Lakeshore cryo controller.")
             try:
                 self.daq = DAQ(self.logger)
-                self.mks925 = PressureGauge('ASRL6::INSTR') ## not set yet
             except:
                 self.daq = 'DAQ'
+                print("Failed to connect to DAQ")
+            try:
+                self.mks925 = PressureGauge('ASRL6::INSTR') ## not set yet
+            except:
                 self.mks925 = 'MKS925'
-                print("Failed to connect to MKS925, DAQ.")
+                print("Failed to connect to MKS925.")
 
         else:
             try:
