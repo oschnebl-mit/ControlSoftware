@@ -31,7 +31,16 @@ class LoggingThread(QtCore.QThread):
                 # self.rxnPressure.get_all_pressures()
                 pressure = self.rxnPressure.get_pressure()
                 self.new_rxn_pressure_data.emit(pressure)
-                print('successfully connected to MKS902, read pressure = ', pressure)
+                print('successfully connected to MKS902 piezo, read pressure = ', pressure)
+            except (OSError, AttributeError) as e:
+                self.logger.exception(e)
+            try:
+                self.rxnPressure = cryoGauge
+                self.rxnPressure.test()
+                # self.rxnPressure.get_all_pressures()
+                pressure = self.rxnPressure.get_pressure()
+                self.new_rxn_pressure_data.emit(pressure)
+                print('successfully connected to MKS925 pirani, read pressure = ', pressure)
             except (OSError, AttributeError) as e:
                 self.logger.exception(e)
             try:

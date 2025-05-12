@@ -119,7 +119,7 @@ class MainControlWindow(qw.QMainWindow):
                 self.daq = 'DAQ'
                 print("Failed to connect to DAQ")
             try:
-                self.mks925 = PressureGauge('ASRL6::INSTR') ## not set yet
+                self.mks925 = PressureGauge(self.logger, 'COM5') ## not set yet
             except:
                 self.mks925 = 'MKS925'
                 print("Failed to connect to MKS925.")

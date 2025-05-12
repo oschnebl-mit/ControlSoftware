@@ -128,9 +128,11 @@ class PressureGauge:
         command = f'@{self._address}PR1?;FF'
         response = self.query(command).decode()
         if re.search('\\d*ACK',response) is not None:
-            list = response.split('ACK')
+            list = re.split('ACK|;',response)
+            print(list)
             value = list[1]
-            return float(value[0:5])
+            print(value)
+            return float(value)
         else:
             self.logger.warning(f'Failed to receive pressure reading... Received {response}')
             return -1
