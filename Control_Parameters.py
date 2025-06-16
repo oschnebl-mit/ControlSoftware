@@ -39,7 +39,7 @@ class CtrlParamTree(ParameterTree):
                     {'name':'Address','type':'str','value':'254'},
                     {'name':'Baud Rate','type':'list','limits':['4800','9600','19200','38400','57600','115200','230400'],'value':'9600'}
                 ]},
-                {'name':'MKS 9025 Setup Parameters','type':'group','children':[
+                {'name':'MKS 925 Setup Parameters','type':'group','children':[
                     {'name':'Pressure unit','type':'str','limits':['TORR','MBAR'],'value':'TORR'},
                     {'name':'Address','type':'str','value':'254'},
                     {'name':'Baud Rate','type':'list','limits':['4800','9600','19200','38400','57600','115200','230400'],'value':'9600'}
@@ -52,35 +52,14 @@ class CtrlParamTree(ParameterTree):
         self.setParameters(self.p,showTop=False)
         
         self.p.sigTreeStateChanged.connect(self.emitChange)
-    '''
-    FROM LAKESHORE DRIVER:
-    def set_heater_pid(self, output, gain, integral, derivative):
-            """Configure the closed loop control parameters of the heater output.
 
-                Args:
-                    output (int):
-                        Specifies which output's control loop to configure.
-                    gain (float):
-                        Proportional term in PID control.
-                        This controls how strongly the control output reacts to the present error.
-                    integral (float):
-                        Integral term in PID control.
-                        This controls how strongly the control output reacts to the past error history.
-                    derivative (float):
-                        Derivative term in PID control.
-                        This value controls how quickly the present field set point will transition to a new set-point.
-                        The ramp rate is configured in field units per second.
-
-            """
-            self.command(f"PID {output},{gain},{integral},{derivative}")
-    '''
-
-    
     def emitChange(self,param,changes):
         self.paramChange.emit(param,changes)
 
-    def getMFCParamValue(self,branch,child):
+    def getMFCParamValue(self,mfc_no,child):
         # print(self.p.param('MFC Setup Parameters','MFC 3 Setup Parameters','Gas Factor').value())
+        ## mfc_no is an integer 1-3
+        branch = f'MFC {mfc_no} Setup Parameters'
         return self.p.param('MFC Setup Parameters',branch,child).value()
     
     def get0254ParamValue(self,branch,child):
