@@ -1,8 +1,9 @@
 import re,pyvisa
 import nidaqmx
-from lakeshore import Model335
+# from lakeshore import Model335
 import numpy as np
 import time
+import serial
 
 class DAQ():
     '''Class for communicating with ni daq that controls relays'''
@@ -70,16 +71,20 @@ class PressureGauge:
     Object that holds the serial communication for a pressure gauge
     '''
 
-    def __init__(self, logger,instrument,deviceAddress='254',delay=10):
+    def __init__(self, logger,instrument,baud_rate = 9600,deviceAddress='254',delay=10):
         '''instrument is string (e.g. 'ASRL3::INSTR') and device Address is string of 5 ints
         '''
-        self._connection: pyvisa = pyvisa.ResourceManager().open_resource(instrument) # read/write terminations?
+        # self._connection: pyvisa = pyvisa.ResourceManager().open_resource(instrument) # read/write terminations?
+        self._connection = serial.Serial(port= instrument, baudrate = baud_rate, parity = serial.PARITY_NONE,
+                    bytesize = 8, stopbits = serial.STOPBITS_ONE,timeout = 1)
         self._address: str = deviceAddress
         self.logger = logger
 
         # if self._address == None:
         #     newaddress = self._ask_address()
         #     self._address = newaddress[7:9]
+        if not self._connection.isOpen():
+            self.logger.warning(f'Failed to open serial connection on com port {instrument}')
 
     def _ask_address(self):
         command = f'@254AD?;FF'
@@ -96,7 +101,8 @@ class PressureGauge:
         '''NOTE: PR1 - PR4 exist, but seems like PR1-PR3 are the same, PR4 is scientific notation'''
         command = f'@{self._address}PR1?;FF'
         self._connection.write(command)
-        response = self._connection.read_bytes(12)
+        # response = self._connection.read_bytes(12) ## for pyvisa
+        response = self._connection.readline()
         if re.search('\\d*ACK',response) is not None:
             return float(response.split('ACK')[0:3])
         else:
@@ -106,17 +112,19 @@ class PressureGauge:
     def set_gauge_params(self,unit='TORR',address='254',baud_rate='9600'):
         ''' From manuals, seems to be the same for both models. I have assumed these are the only settings of interest
         Note the ! sets, while ? is for queries'''
-        response = self._connection.query( f'@{self._address}U!{unit};FF')
+        # response = self._connection.query( f'@{self._address}U!{unit};FF')
+        self._connection.write(f'@{self._address}U!{unit};FF')
+        response = self._connection.readline()
         if re.search('\\d*ACK',response) is None:
             logger.warning(f'Failed to set pressure unit... Received {response}')
-        response = self._connection.query( f'@{self._address}AD!{address};FF')
-        if re.search(f'\\d*ACK',response) is None:
-            logger.warning(f'Failed to set address... Received {response}')
-        else:
-            self._address = address ## assumes it succeded
-        response = self._connection.query( f'@{self._address}BR!{baud_rate};FF')
-        if re.search("\\d*ACK",response) is None:
-            logger.warning(f'Failed to set baud rate... Received {response}')
+        # response = self._connection.query( f'@{self._address}AD!{address};FF')
+        # if re.search(f'\\d*ACK',response) is None:
+        #     logger.warning(f'Failed to set address... Received {response}')
+        # else:
+        #     self._address = address ## assumes it succeded
+        # response = self._connection.query( f'@{self._address}BR!{baud_rate};FF')
+        # if re.search("\\d*ACK",response) is None:
+        #     logger.warning(f'Failed to set baud rate... Received {response}')
 
 
 class Brooks0254:
