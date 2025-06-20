@@ -25,31 +25,31 @@ class LoggingThread(QtCore.QThread):
             self.mfcControl = mfcControl
 
         elif self.testing:
-            try:
-                self.rxnPressure = rxnGauge
-                self.rxnPressure.test()
-                # self.rxnPressure.get_all_pressures()
-                pressure = self.rxnPressure.get_pressure()
-                self.new_rxn_pressure_data.emit(pressure)
-                print('successfully connected to MKS902 piezo, read pressure = ', pressure)
-            except (OSError, AttributeError) as e:
-                self.logger.exception(e)
-            try:
-                self.rxnPressure = cryoGauge
-                self.rxnPressure.test()
-                # self.rxnPressure.get_all_pressures()
-                pressure = self.rxnPressure.get_pressure()
-                self.new_rxn_pressure_data.emit(pressure)
-                print('successfully connected to MKS925 pirani, read pressure = ', pressure)
-            except (OSError, AttributeError) as e:
-                self.logger.exception(e)
-            try:
-                self.mfcControl = mfcControl
-                flow = self.mfcControl.MFC1.get_measured_values()
+            # try:
+            #     self.rxnPressure = rxnGauge
+            #     self.rxnPressure.test()
+            #     # self.rxnPressure.get_all_pressures()
+            #     pressure = self.rxnPressure.get_pressure()
+            #     self.new_rxn_pressure_data.emit(pressure)
+            #     print('successfully connected to MKS902 piezo, read pressure = ', pressure)
+            # except (OSError, AttributeError) as e:
+            #     self.logger.exception(e)
+            # try:
+            #     self.rxnPressure = cryoGauge
+            #     self.rxnPressure.test()
+            #     # self.rxnPressure.get_all_pressures()
+            #     pressure = self.rxnPressure.get_pressure()
+            #     self.new_rxn_pressure_data.emit(pressure)
+            #     print('successfully connected to MKS925 pirani, read pressure = ', pressure)
+            # except (OSError, AttributeError) as e:
+            #     self.logger.exception(e)
+            # try:
+            #     self.mfcControl = mfcControl
+            #     flow = self.mfcControl.MFC1.get_measured_values()
                 
-                print('successfully connected to Brooks0254, read values = ', flow)
-            except (OSError,AttributeError) as e:
-                self.logger.exception(e)
+            #     print('successfully connected to Brooks0254, read values = ', flow)
+            # except (OSError,AttributeError) as e:
+            #     self.logger.exception(e)
             
             try:
                 self.cryoControl = cryoControl
@@ -67,12 +67,22 @@ class LoggingThread(QtCore.QThread):
         while self.running:
             if self.testing:
                 rng = np.random.default_rng()
-                self.new_rxn_temp_data.emit(200+rng.random())
-                self.new_cryo_temp_data.emit(170+rng.random())
+                
                 # self.new_flow_data.emit(0)
                 self.new_rxn_pressure_data.emit(1*rng.random())
                 self.new_cryo_pressure_data.emit(0.1*rng.random())
-                print(f'logging cryo temp:{170+rng.random()}')
+
+                try:
+                    # self.cryoControl = cryoControl
+                    [cryo_temp,rxn_temp] = self.cryoControl.get_all_kelvin_reading()
+                    self.new_cryo_temp_data.emit(cryo_temp)
+                    self.new_rxn_temp_data.emit(rxn_temp)
+                    # print(f'Successfully connected to Lakeshore 335. Read temp {cryo_temp}')
+                except (OSError,AttributeError) as e:
+                    self.logger.exception(e)
+                    self.new_rxn_temp_data.emit(200+rng.random())
+                    self.new_cryo_temp_data.emit(170+rng.random())
+                    # print(f'logging cryo temp:{170+rng.random()}')
             else:
                 [cryo_temp, rxn_temp] = self.cryoControl.get_all_kelvin_reading()
                 log_dict = {
