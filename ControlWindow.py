@@ -108,7 +108,7 @@ class MainControlWindow(qw.QMainWindow):
                 self.b0254 = 'Brooks0254'
                 print("Failed to connect to Brooks0254 MFC controller.")
             try:
-                self.ls335 = Model335(57600)
+                self.ls335 = Model335(baud_rate=57600)
                 self.setCryoButton.clicked.connect(self.change_cryo)
             except:
                 self.ls335 = 'Model335'
@@ -128,9 +128,9 @@ class MainControlWindow(qw.QMainWindow):
             try:
                 self.ls335 = Model335(57600)
                 self.daq = DAQ(self.logger)
-                self.mks902 = PressureGauge('ASRL3::INSTR') 
-                self.mks925 = PressureGauge('ASRL6::INSTR') ## not set yet
-                self.b0254 = Brooks0254('ASRL4::INSTR') ## 
+                self.mks902 = PressureGauge(self.logger,'COM3') 
+                self.mks925 = PressureGauge(self.logger,'COM5')
+                self.b0254 = Brooks0254('ASRL4::INSTR') ##  ## not set yet
 
                 self.setCryoButton.clicked.connect(self.change_cryo())
             except OSError as e:

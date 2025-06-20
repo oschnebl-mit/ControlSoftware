@@ -9,7 +9,24 @@
 # lakeshore.write('*IDN?')
 # print(lakeshore.read())
 # lakeshore.close()
+# import serial
+# ser = serial.Serial(
+#         port="COM6", baudrate = 57600,
+#         parity=serial.PARITY_ODD,
+#         bytesize=7,stopbits=serial.STOPBITS_ONE, timeout=1)
+# if ser.isOpen():
+#     print(ser.name + ' is open...')
+#         # for j in range(2):
+#         #     print(ser.readline())
+   
+# ser.write(b'*IDN?')
+    
+# for n in range(3):
+#     rsp = ser.readline()
+#     print(rsp)
+#     print(rsp.decode())
 
+# ser.close()
 
 ## Easy Mode:
 from lakeshore import Model335
