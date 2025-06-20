@@ -97,7 +97,7 @@ class MainControlWindow(qw.QMainWindow):
        ## If testing, don't error out if failed to make connections
         if self.testing:
             try:
-                self.mks902 = PressureGauge(self.logger,'COM5') ##
+                self.mks902 = PressureGauge(self.logger,'COM3') ##
             except:
                 self.mks902 = 'MKS902'
                 print("Failed to connect to MKS902 gauge.")
@@ -109,7 +109,7 @@ class MainControlWindow(qw.QMainWindow):
                 print("Failed to connect to Brooks0254 MFC controller.")
             try:
                 self.ls335 = Model335(baud_rate=57600)
-                self.setCryoButton.clicked.connect(self.change_cryo)
+                # self.setCryoButton.clicked.connect(self.change_cryo)
             except:
                 self.ls335 = 'Model335'
                 print("Failed to connect to Lakeshore cryo controller.")

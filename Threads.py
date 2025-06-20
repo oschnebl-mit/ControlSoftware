@@ -25,24 +25,24 @@ class LoggingThread(QtCore.QThread):
             self.mfcControl = mfcControl
 
         elif self.testing:
-            # try:
-            #     self.rxnPressure = rxnGauge
-            #     self.rxnPressure.test()
-            #     # self.rxnPressure.get_all_pressures()
-            #     pressure = self.rxnPressure.get_pressure()
-            #     self.new_rxn_pressure_data.emit(pressure)
-            #     print('successfully connected to MKS902 piezo, read pressure = ', pressure)
-            # except (OSError, AttributeError) as e:
-            #     self.logger.exception(e)
-            # try:
-            #     self.rxnPressure = cryoGauge
-            #     self.rxnPressure.test()
-            #     # self.rxnPressure.get_all_pressures()
-            #     pressure = self.rxnPressure.get_pressure()
-            #     self.new_rxn_pressure_data.emit(pressure)
-            #     print('successfully connected to MKS925 pirani, read pressure = ', pressure)
-            # except (OSError, AttributeError) as e:
-            #     self.logger.exception(e)
+            try:
+                self.rxnPressure = rxnGauge
+                self.rxnPressure.test()
+                # self.rxnPressure.get_all_pressures()
+                pressure = self.rxnPressure.get_pressure()
+                self.new_rxn_pressure_data.emit(pressure)
+                print('successfully connected to MKS902 piezo, read pressure = ', pressure)
+            except (OSError, AttributeError) as e:
+                self.logger.exception(e)
+            try:
+                self.rxnPressure = cryoGauge
+                self.rxnPressure.test()
+                # self.rxnPressure.get_all_pressures()
+                pressure = self.rxnPressure.get_pressure()
+                self.new_rxn_pressure_data.emit(pressure)
+                print('successfully connected to MKS925 pirani, read pressure = ', pressure)
+            except (OSError, AttributeError) as e:
+                self.logger.exception(e)
             # try:
             #     self.mfcControl = mfcControl
             #     flow = self.mfcControl.MFC1.get_measured_values()
@@ -53,7 +53,8 @@ class LoggingThread(QtCore.QThread):
             
             try:
                 self.cryoControl = cryoControl
-                [cryo_temp,rxn_temp] = self.cryoControl.get_all_kelvin_reading()
+                cryo_temp = self.cryoControl.query("KRDG? A")
+                # [cryo_temp,rxn_temp] = cryoControl.get_all_kelvin_reading()
                 self.new_cryo_temp_data.emit(cryo_temp)
                 print(f'Successfully connected to Lakeshore 335. Read temp {cryo_temp}')
             except (OSError,AttributeError) as e:
