@@ -12,7 +12,7 @@ from Control_Parameters import CtrlParamTree, ProcessTree
 from DummyPressureThread import DummyThread, NotAsDumbThread
 from Threads import LoggingThread, PurgeThread, DoseThread
 from Instruments import PressureGauge, DAQ, Brooks0254
-# from lakeshore import Model335
+from lakeshore import Model335
 
 class MainControlWindow(qw.QMainWindow):
     def __init__(self, logger, testing = False):
@@ -23,8 +23,8 @@ class MainControlWindow(qw.QMainWindow):
         self.setWindowTitle('Control Panel')
 
 
-        # self.resize(1280,720) # non-maximized state
-        self.resize(2560, 1440)  # for home monitor
+        self.resize(1280,720) # non-maximized state
+        # self.resize(2560, 1440)  # for home monitor
         if self.testing == False:
             self.showMaximized()
 
@@ -47,10 +47,9 @@ class MainControlWindow(qw.QMainWindow):
 
            ## connect UI items to running functions
             self.mfcButton.clicked.connect(self.setupMFCs)
-            self.mks925Button.clicked.connect(self.mks902.setupGauge)
-            self.mks902Button.clicked.connect(self.mks925.setupGauge)
+            self.mks925Button.clicked.connect(self.setupMKS925)
+            self.mks902Button.clicked.connect(self.setupMKS902)
             # self.changeTempButton.clicked.connect(lambda: self.ls335.changeSetpoint(float(self.tempInput.text())))
-            self.changeTempButton.clicked.connect(self.sendTempSignal)
 
         ## connect logging plots, if testing the logging thread will give dummy data
         self.logging_thread.new_cryo_pressure_data.connect(self.cryoVac_grp.update_plot)
@@ -81,18 +80,6 @@ class MainControlWindow(qw.QMainWindow):
         self.logging_thread.delay = self.logging_delay
         print(f'Updating log interval to {self.logging_delay}s')
 
-    def sendDemoSignal(self):
-        # Testing out thread functon
-        self.nadt.setpoint = float(self.tempInput.text())
-        self.nadt.updateCryoSetpoint()
-
-    def sendTempSignal(self):
-        ## reads setpoint from the line edit input box, then uses the wrapper function to pass that value to the controller
-        self.ls335.setpoint = float(self.tempInput.text())
-        self.ls335.ramp_rate = float(self.tempRampInput.text())
-        self.ls335.changeSetpoint()
-        self.ls335.changeRamp()
-
     def abortAll(self):
         ## Stop all processes (except logging) and close all valves
         ## any other safety things? change cryo?
@@ -110,34 +97,42 @@ class MainControlWindow(qw.QMainWindow):
        ## If testing, don't error out if failed to make connections
         if self.testing:
             try:
-                self.mks902 = PressureGauge(self.logger,'ASRL3::INSTR') ##
+                self.mks902 = PressureGauge(self.logger,'COM3') ##
             except:
                 self.mks902 = 'MKS902'
                 print("Failed to connect to MKS902 gauge.")
             try:
                 self.b0254 = Brooks0254(self.logger,    'ASRL4::INSTR') ## 
+                self.mfcButton.clicked.connect(self.setupMFCs)
             except:
                 self.b0254 = 'Brooks0254'
                 print("Failed to connect to Brooks0254 MFC controller.")
             try:
-                self.ls335 = Model335(57600)
+                self.ls335 = Model335(baud_rate=57600)
+                # self.setCryoButton.clicked.connect(self.change_cryo)
             except:
                 self.ls335 = 'Model335'
-                print("Failed to connect to Lakeshore cryo controller")
+                print("Failed to connect to Lakeshore cryo controller.")
             try:
                 self.daq = DAQ(self.logger)
-                self.mks925 = PressureGauge('ASRL6::INSTR') ## not set yet
             except:
                 self.daq = 'DAQ'
+                print("Failed to connect to DAQ")
+            try:
+                self.mks925 = PressureGauge(self.logger, 'COM5') ## not set yet
+            except:
                 self.mks925 = 'MKS925'
+                print("Failed to connect to MKS925.")
 
         else:
             try:
                 self.ls335 = Model335(57600)
                 self.daq = DAQ(self.logger)
-                self.mks902 = PressureGauge('ASRL3::INSTR') 
-                self.mks925 = PressureGauge('ASRL6::INSTR') ## not set yet
-                self.b0254 = Brooks0254('ASRL4::INSTR') ## 
+                self.mks902 = PressureGauge(self.logger,'COM3') 
+                self.mks925 = PressureGauge(self.logger,'COM5')
+                self.b0254 = Brooks0254('ASRL4::INSTR') ##  ## not set yet
+
+                self.setCryoButton.clicked.connect(self.change_cryo())
             except OSError as e:
                 self.logger.exception(e)
 
@@ -154,7 +149,7 @@ class MainControlWindow(qw.QMainWindow):
         self.currentProcessPlot.clear() #only needed if not the first run
         self.currentProcessPlot_grp.group.setTitle("Purge Process") # use class func for QGroupBox
         self.currentProcessPlot.setLabel('left','Pressure', units='Torr')
-        self.currentProcessPlot_grp.trace = pg.PlotCurveItem(pen=self.pressurePen,symbol='o')
+        self.currentProcessPlot_grp.trace = pg.PlotCurveItem(pen=self.pressurePen,symbol='o',color='#08F7FE')
         self.currentProcessPlot.addItem(self.currentProcessPlot_grp.trace)
         self.purge_thread.new_pressure.connect(self.currentProcessPlot_grp.update_plot)
         self.purge_thread.message.connect(self.currentProcessPlot_grp.message.setText)
@@ -202,6 +197,46 @@ class MainControlWindow(qw.QMainWindow):
     def doseFinished(self):
         self.currentProcessPlot_grp.message.setText('Dose process finished')
         self.dose_thread.running = False
+
+    def change_cryo(self):
+        loop = self.processTree.getCryoValue('Control Loop')
+        ramp_enable = self.processTree.getCryoValue('Control Loop')
+        ramp_rate = self.processTree.getCryoValue('Ramp Rate (K/min)')
+        setpoint = self.processTree.getCryoValue('Setpoint (K)')
+        self.ls335.set_setpoint_ramp_parameter(loop,ramp_enable,ramp_rate)
+        self.ls335.set_control_setpoint(loop, setpoint)
+        self.logger.info(f'Setting cryostat loop {loop} to {setpoint} K at rate of {ramp_rate} K/min')
+
+    
+    def sendDemoSignal(self):
+        # Testing out thread functon
+        self.nadt.setpoint = float(self.tempInput.text())
+        self.nadt.updateCryoSetpoint()
+
+    def setupMKS925(self):
+        ## function intended to troubleshoot connection to pressure gauge from within gui
+        unit = self.ctrlTree.getPressureParamValue('MKS 925 Setup Parameters','Pressure unit')
+        addr = self.ctrlTree.getPressureParamValue('MKS 925 Setup Parameters','Address')
+        baud = self.ctrlTree.getPressureParamValue('MKS 925 Setup Parameters','Baud Rate')
+        self.logger.debug(f'Setting MKS925 gauge to new parameters: {unit},{addr},{baud}')
+        self.mks925.set_gauge_params(unit,addr,baud)
+
+    def setupMKS902(self):
+        ## function intended to troubleshoot connection to pressure gauge from within gui
+        unit = self.ctrlTree.getPressureParamValue('MKS 902B Setup Parameters','Pressure unit')
+        addr = self.ctrlTree.getPressureParamValue('MKS 902B Setup Parameters','Address')
+        baud = self.ctrlTree.getPressureParamValue('MKS 902B Setup Parameters','Baud Rate')
+        self.logger.debug(f'Setting MKS902B gauge to new parameters: {unit},{addr},{baud}')
+        self.mks902.set_gauge_params(unit,addr,baud)
+
+    def setupMFCs(self):
+        for i in range(3):
+            gas_factor = self.ctrlTree.getMFCParamValue(i+1,'Gas Factor')
+            rate_units = self.ctrlTree.getMFCParamValue(i+1,'Rate Units')
+            time_base = self.ctrlTree.getMFCParamValue(i+1,'Time Base')
+            decimal_point = self.ctrlTree.getMFCParamValue(i+1,'Decimal Point')
+            func = self.ctrlTree.getMFCParamValue(i+1,'SP Function')
+            self.b0254.MFC_list[i].setup_MFC(gas_factor,rate_units,time_base,decimal_point,func)
 
     def initUI(self):
         ### # Dedicated colors which look "good"
@@ -261,7 +296,7 @@ class MainControlWindow(qw.QMainWindow):
 
         self.processTree = ProcessTree()
 
-        
+        self.setCryoButton = qw.QPushButton("Change Cryo Setpoint")
         '''
         Some notes on the grid layout: 
         Because the buttons are small relative to the plots, the plots span many rows
@@ -269,7 +304,7 @@ class MainControlWindow(qw.QMainWindow):
 
         '''
         ## Fix the row widths to be more uniform
-        for r in range(16):
+        for r in range(21):
             layout.setRowMinimumHeight(r,1)
         
         layout.setColumnStretch(0,1)
@@ -286,7 +321,7 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.ctrlTree,        3,0,13,1)
 
         ## Top middle buttons and inputs (start at col 1, row 0)
-        layout.addWidget(self.processTree,     0,1,8,1)
+        layout.addWidget(self.processTree,     0,1,10,1)
 
         layout.addWidget(self.logLabel,        0,2,1,1)
         layout.addWidget(self.logInput,        1,2,1,1)
@@ -298,15 +333,16 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.doseH2SButton,   5,2,1,1)
         layout.addWidget(self.doseH2Button,    6,2,1,1)
         # layout.addWidget(self.abortButton,     7,2,1,1)
+        layout.addWidget(self.setCryoButton,   7,2,1,1)
 
         ## current process plot middle bottom (start at row 8, col 1)
-        layout.addWidget(self.currentProcessPlot_grp,9,1,7,2)
+        layout.addWidget(self.currentProcessPlot_grp,10,1,10,2)
 
         ## Right Hand column of plots
-        layout.addWidget(self.cryoTemp_grp,0,3,4,1)
-        layout.addWidget(self.cryoVac_grp,4,3,4,1)
-        layout.addWidget(self.rxnTemp_grp,8,3,4,1)
-        layout.addWidget(self.rxnVac_grp,12,3,4,1)
+        layout.addWidget(self.cryoTemp_grp,    0, 3,5,1)
+        layout.addWidget(self.cryoVac_grp,     5, 3,5,1)
+        layout.addWidget(self.rxnTemp_grp,     10,3,5,1)
+        layout.addWidget(self.rxnVac_grp,      15,3,5,1)
 
 
 class BoxedPlot(qw.QWidget):
@@ -353,12 +389,13 @@ class LoggingPlot(qw.QWidget):
     def __init__(self, plot_title, color):
         super().__init__()
         masterLayout = qw.QVBoxLayout()
-        self.pen = pg.mkPen(color, width=2)
+        self.pen = pg.mkPen(color, width=1)
+        self.brush = pg.mkBrush(color)
         layout = qw.QVBoxLayout()
         self.group = qw.QGroupBox(plot_title)
         self.plot = pg.PlotWidget()
         # self.trace = pg.PlotCurveItem(pen=self.pen)
-        self.trace = pg.PlotDataItem(pen=self.pen,symbol='o') ## trying this to have points and lines
+        self.trace = pg.PlotDataItem(pen=self.pen,symbol='o',symbolBrush=self.brush) ## trying this to have points and lines
         self.plot.addItem(self.trace)
         # self.trace.setSkipFiniteCheck(True)
         self.plot.getPlotItem().showGrid(x=True, y=True, alpha=0.5)
@@ -373,14 +410,14 @@ class LoggingPlot(qw.QWidget):
 
     def update_plot(self,new_data):
         xdata,ydata = self.trace.getData()
-        print(xdata,ydata)
+        # print(xdata,ydata)
         if xdata is None:
             xdata = np.array([t.time()])
             ydata = np.array([new_data])
         else:
             xdata = np.append(xdata,t.time())
             ydata = np.append(ydata,new_data)
-        print(xdata,ydata)
+        # print(xdata,ydata)
         self.trace.setData(x=xdata, y=ydata)
         # self.plot.getViewBox().autoRange()
 
@@ -389,7 +426,7 @@ if __name__ == "__main__":
     # import pyvisa # if not demoMode
     timestr = t.strftime('%Y%m%d-%H%M%S')
     logger = logging.getLogger(__name__)
-    logging.basicConfig(filename=f'logs/CryoControlTest_{timestr}.log',level=logging.INFO)
+    logging.basicConfig(filename=f'logs/CryoControlTest_{timestr}.log',level=logging.DEBUG)
     logger.addHandler(logging.NullHandler())
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())

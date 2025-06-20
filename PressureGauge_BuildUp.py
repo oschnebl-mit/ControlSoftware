@@ -209,7 +209,7 @@ if __name__ == "__main__":
 ## on 3/6/2 the above gneeric serial device strategy is not working
 
     ser = serial.Serial(
-        port="COM3", baudrate = 9600,
+        port="COM5", baudrate = 9600,
         parity=serial.PARITY_NONE,
         bytesize=8,stopbits=serial.STOPBITS_ONE, timeout=1)
     if ser.isOpen():
@@ -217,7 +217,12 @@ if __name__ == "__main__":
         # for j in range(2):
         #     print(ser.readline())
     ## Write ASCII Commands To TSI 4043 Flow Sensor
-    ser.write(b'@253AD?;FF') # test mode (flashes LED)  
+    # ser.write(b'@254AD?;FF') # test mode (flashes LED)  
+    # ser.write(b'@254TST!ON;FF')
+    # print(ser.readline().decode())
+    # time.sleep(10)
+    # ser.write(b'@254TST!OFF;FF')
+    ser.write(b'@254PR1?;FF')
     
     for n in range(3):
         rsp = ser.readline()

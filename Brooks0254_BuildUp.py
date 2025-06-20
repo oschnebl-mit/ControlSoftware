@@ -113,6 +113,65 @@ class MassFlowController:
         'PV_Full_Scale':'09'
     }
 
+    MEASUREMENT_UNITS = dict({
+        "ml": 0,
+        "mls": 1,
+        "mln": 2,
+        "l": 3,
+        "ls": 4,
+        "ln": 5,
+        "cm^3": 6,
+        "cm^3s": 7,
+        "cm^3n": 8,
+        "m^3": 9,
+        "m^3s": 10,
+        "m^3n": 11,
+        "g": 12,
+        "lb": 13,
+        "kg": 14,
+        "ft^3": 15,
+        "ft^3s": 16,
+        "ft^3n": 17,
+        "scc": 18,
+        "sl": 19,
+        "bar": 20,
+        "mbar": 21,
+        "psi": 22,
+        "kPa": 23,
+        "Torr": 24,
+        "atm": 25,
+        "Volt": 26,
+        "mA": 27,
+        "oC": 28,
+        "oK": 29,
+        "oR": 30,
+        "oF": 31,
+        "g/cc": 32,
+        "sg": 33,
+        "%": 34,
+        "lb/in^3": 35,
+        "lb/ft^3": 36,
+        "lb/gal": 37,
+        "kg/m^3": 38,
+        "g/ml": 39,
+        "kg/l": 40,
+        "g/l": 41
+    })
+
+    # Base time units
+    RATE_TIME_BASE = dict({
+        "sec": 1,
+        "min": 2,
+        "hrs": 3,
+        "day": 4
+    })
+
+    SP_FUNCTION = {
+        'rate': 1,
+        'batch': 2,
+        'blend': 3
+    }
+
     def __init__(self,channel,pyvisaConnection,deviceAddress=''):
         '''
         Channel refers to each MFC (different gases)
