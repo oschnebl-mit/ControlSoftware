@@ -23,8 +23,8 @@ class MainControlWindow(qw.QMainWindow):
         self.setWindowTitle('Control Panel')
 
 
-        # self.resize(1280,720) # non-maximized state
-        self.resize(2560, 1440)  # for home monitor
+        self.resize(1280,720) # non-maximized state
+        # self.resize(2560, 1440)  # for home monitor
         if self.testing == False:
             self.showMaximized()
 
@@ -97,7 +97,7 @@ class MainControlWindow(qw.QMainWindow):
        ## If testing, don't error out if failed to make connections
         if self.testing:
             try:
-                self.mks902 = PressureGauge(self.logger,'COM3') ##
+                self.mks902 = PressureGauge(self.logger,'COM5') ##
             except:
                 self.mks902 = 'MKS902'
                 print("Failed to connect to MKS902 gauge.")
@@ -108,7 +108,7 @@ class MainControlWindow(qw.QMainWindow):
                 self.b0254 = 'Brooks0254'
                 print("Failed to connect to Brooks0254 MFC controller.")
             try:
-                self.ls335 = Model335(57600)
+                self.ls335 = Model335(baud_rate=57600)
                 self.setCryoButton.clicked.connect(self.change_cryo)
             except:
                 self.ls335 = 'Model335'
@@ -410,14 +410,14 @@ class LoggingPlot(qw.QWidget):
 
     def update_plot(self,new_data):
         xdata,ydata = self.trace.getData()
-        print(xdata,ydata)
+        # print(xdata,ydata)
         if xdata is None:
             xdata = np.array([t.time()])
             ydata = np.array([new_data])
         else:
             xdata = np.append(xdata,t.time())
             ydata = np.append(ydata,new_data)
-        print(xdata,ydata)
+        # print(xdata,ydata)
         self.trace.setData(x=xdata, y=ydata)
         # self.plot.getViewBox().autoRange()
 
