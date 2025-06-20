@@ -218,11 +218,11 @@ if __name__ == "__main__":
         #     print(ser.readline())
     ## Write ASCII Commands To TSI 4043 Flow Sensor
     # ser.write(b'@254AD?;FF') # test mode (flashes LED)  
-    ser.write(b'@254TST!ON;FF')
-    print(ser.readline().decode())
-    time.sleep(10)
-    ser.write(b'@254TST!OFF;FF')
-    ser.write(b'@254PR1?;FF')
+    # ser.write(b'@254TST!ON;FF')
+    # print(ser.readline().decode())
+    # time.sleep(10)
+    # ser.write(b'@254TST!OFF;FF')
+    ser.write(b'@254FD!ALL;FF')
     
     for n in range(3):
         rsp = ser.readline()

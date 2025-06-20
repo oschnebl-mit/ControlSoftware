@@ -8,8 +8,6 @@ from threading import Lock
 class DAQ():
     '''Class for communicating with ni daq that controls relays'''
     def __init__(self, logger):
-        system = nidaqmx.system.System.local()
-        DAQ_device = system.device['Dev1']
         self.logger = logger
         
         ## use nidaqmx Task() to create digital output channels (on/off relays)
