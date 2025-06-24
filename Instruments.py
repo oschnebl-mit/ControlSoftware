@@ -119,7 +119,7 @@ class PressureGauge:
                 self._connection.write(command.encode('utf-8'))
                 # response = self._connection.read_bytes(15)
                 response = self._connection.readline()
-                print(f'PR{i} = {response}')
+                # print(f'PR{i} = {response}')
 
     def get_pressure(self):
         '''NOTE: PR1 - PR4 exist, but seems like PR1-PR3 are the same, PR4 is scientific notation'''
@@ -127,9 +127,9 @@ class PressureGauge:
         response = self.query(command).decode()
         if re.search('\\d*ACK',response) is not None:
             list = re.split('ACK|;',response)
-            print(list)
+            # print(list)
             value = list[1]
-            print(value)
+            # print(value)
             return float(value)
         else:
             self.logger.warning(f'Failed to receive pressure reading... Received {response}')

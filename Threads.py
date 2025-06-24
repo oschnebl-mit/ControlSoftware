@@ -1,6 +1,7 @@
-from time import time, sleep
+from time import time, sleep,strftime
 from PyQt5 import QtCore
 import numpy as np
+import csv
 # import pandas as pd
 
 class LoggingThread(QtCore.QThread):
@@ -26,6 +27,13 @@ class LoggingThread(QtCore.QThread):
 
         elif self.testing:
             try:
+                self.cryoControl = cryoControl
+                cryo_temp = float(cryoControl.query('KRDG? A',check_errors=False))
+                self.new_cryo_temp_data.emit(cryo_temp)
+                print(f'Successfully connected to Lakeshore 335, read temp {cryo_temp}')
+            except (OSError,AttributeError) as e:
+                self.logger.exception(e)
+            try:
                 self.rxnPressure = rxnGauge
                 self.rxnPressure.test()
                 pressure = self.rxnPressure.get_pressure()
@@ -36,8 +44,8 @@ class LoggingThread(QtCore.QThread):
             try:
                 self.cryoPressure = cryoGauge
                 self.cryoPressure.test()
-                pressure = self.rxnPressure.get_pressure()
-                self.new_rxn_pressure_data.emit(pressure)
+                pressure = self.cryoressure.get_pressure()
+                self.new_cryo_pressure_data.emit(pressure)
                 print('successfully connected to MKS925 pirani, read pressure = ', pressure)
             except (OSError, AttributeError) as e:
                 self.logger.exception(e)
@@ -49,41 +57,48 @@ class LoggingThread(QtCore.QThread):
             except (OSError,AttributeError) as e:
                 self.logger.exception(e)
             
-            try:
-                self.cryoControl = cryoControl
-                cryo_temp = self.cryoControl.query("KRDG? A")
-                self.new_cryo_temp_data.emit(cryo_temp)
-                print(f'Successfully connected to Lakeshore 335, read temp {cryo_temp}')
-            except (OSError,AttributeError) as e:
-                self.logger.exception(e)
-
-
+            self.log_path = f'logs/CryoTest_{strftime('%Y%m%d-%H%M%S')}.csv'
+            
         self.running = False
 
     def run(self):
         self.running=True
+        row = 0
         while self.running:
             if self.testing:
                 rng = np.random.default_rng()
-    
-                self.new_rxn_pressure_data.emit(1*rng.random())
-                self.new_cryo_pressure_data.emit(0.1*rng.random())
-
                 try:
-                    [cryo_temp,rxn_temp] = self.cryoControl.get_all_kelvin_reading()
+                    cryo_temp = float(self.cryoControl.query('KRDG? A',check_errors=False))
+                    rxn_temp = float(self.cryoControl.query("KRDG? B", check_errors=False))
                     self.new_cryo_temp_data.emit(cryo_temp)
                     self.new_rxn_temp_data.emit(rxn_temp)
-                    # print(f'Successfully connected to Lakeshore 335. Read temp {cryo_temp}')
+                    self.new_cryo_pressure_data.emit(self.cryoPressure.get_pressure())
+                    self.new_rxn_pressure_data.emit(self.rxnPressure.get_pressure())
+                    log_dict = {
+                    'Reaction Pressure':self.rxnPressure.get_pressure(),
+                    'Cryo Pressure':self.cryoPressure.get_pressure(),
+                    'Reaction Temperature':rxn_temp,
+                    'Cryo Temperature':cryo_temp
+                        }
+                    with open(self.log_path,'a',newline='') as csvfile:
+                        w = csv.DictWriter(csvfile, log_dict.keys())
+                        if row == 0:
+                            w.writeheader()
+                        w.writerow(log_dict)
+                        # writer = csv.writer(csvfile, delimiter=' ',
+                                    # quotechar='|', quoting=csv.QUOTE_MINIMAL)
+                        row +=1 
                 except (OSError,AttributeError) as e:
                     self.logger.exception(e)
                     self.new_rxn_temp_data.emit(200+rng.random())
                     self.new_cryo_temp_data.emit(170+rng.random())
-                    # print(f'logging cryo temp:{170+rng.random()}')
+                    self.new_rxn_pressure_data.emit(1*rng.random())
+                    self.new_cryo_pressure_data.emit(0.1*rng.random())
             else:
                 [cryo_temp, rxn_temp] = self.cryoControl.get_all_kelvin_reading()
                 log_dict = {
-                    'Reaction Pressure':self.rxnGauge.get_pressure(),
-                    'Cryo Pressure':self.cryoGauge.get_pressure(),
+                    'Reaction Pressure':self.rxnPressure.get_pressure(),
+                    'Cryo Pressure':self.cryoPressure.get_pressure(),
                     'Reaction Temperature':rxn_temp,
                     'Cryo Temperature':cryo_temp
                 }
