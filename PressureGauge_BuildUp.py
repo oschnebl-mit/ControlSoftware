@@ -229,6 +229,7 @@ if __name__ == "__main__":
         print(rsp)
         print(rsp.decode())
 
+    print(ser.query(b'@254PR1?;FF'))
     ser.close()
  ## on 3/6/25 the above returned 
     #     COM3 is open...

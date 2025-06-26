@@ -10,24 +10,24 @@
 # print(lakeshore.read())
 # lakeshore.close()
 
-import serial
-ser = serial.Serial(
-        port="COM6", baudrate = 57600,
-        parity=serial.PARITY_ODD,
-        bytesize=7,stopbits=serial.STOPBITS_ONE, timeout=1)
-if ser.isOpen():
-    print(ser.name + ' is open...')
-        # for j in range(2):
-        #     print(ser.readline())
+# import serial
+# ser = serial.Serial(
+#         port="COM6", baudrate = 57600,
+#         parity=serial.PARITY_ODD,
+#         bytesize=7,stopbits=serial.STOPBITS_ONE, timeout=1)
+# if ser.isOpen():
+#     print(ser.name + ' is open...')
+#         # for j in range(2):
+#         #     print(ser.readline())
    
-ser.write(b'*IDN?')
+# ser.write(b'*IDN?')
     
-for n in range(3):
-    rsp = ser.readline()
-    # print(rsp)
-    print(rsp.decode())
+# for n in range(3):
+#     rsp = ser.readline()
+#     # print(rsp)
+#     print(rsp.decode())
 
-ser.close()
+# ser.close()
 
 ## Easy Mode:
 from lakeshore import Model335
@@ -35,7 +35,9 @@ from lakeshore import Model335
 my_instrument = Model335(baud_rate=57600)
 [A,B]=my_instrument.get_all_kelvin_reading()
 print(f"Read A = {A} K and B = {B} K")
-print(my_instrument.query("KRDG? A"))
+print(my_instrument.query("*IDN?"))
+
+my_instrument.disconnect_usb()
 
 ### testing 6/13/2025: niether version is working, COM6 isn't showing up in device manager
 ### testing 6/16/2025: lakeshore's Model335 package worked on my surface, just had to change baud rate in device manager

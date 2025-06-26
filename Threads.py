@@ -29,7 +29,7 @@ class LoggingThread(QtCore.QThread):
             try:
                 self.cryoControl = cryoControl
                 cryo_temp = float(cryoControl.query('KRDG? A',check_errors=False))
-                self.new_cryo_temp_data.emit(cryo_temp)
+                # self.new_cryo_temp_data.emit(cryo_temp)
                 print(f'Successfully connected to Lakeshore 335, read temp {cryo_temp}')
             except (OSError,AttributeError) as e:
                 self.logger.exception(e)
@@ -37,7 +37,7 @@ class LoggingThread(QtCore.QThread):
                 self.rxnPressure = rxnGauge
                 self.rxnPressure.test()
                 pressure = self.rxnPressure.get_pressure()
-                self.new_rxn_pressure_data.emit(pressure)
+                # self.new_rxn_pressure_data.emit(pressure)
                 print('successfully connected to MKS902 piezo, read pressure = ', pressure)
             except (OSError, AttributeError) as e:
                 self.logger.exception(e)
@@ -45,17 +45,17 @@ class LoggingThread(QtCore.QThread):
                 self.cryoPressure = cryoGauge
                 self.cryoPressure.test()
                 pressure = self.cryoressure.get_pressure()
-                self.new_cryo_pressure_data.emit(pressure)
+                # self.new_cryo_pressure_data.emit(pressure)
                 print('successfully connected to MKS925 pirani, read pressure = ', pressure)
             except (OSError, AttributeError) as e:
                 self.logger.exception(e)
-            try:
-                self.mfcControl = mfcControl
-                flow = self.mfcControl.MFC1.get_measured_values()
+            # try:
+            #     self.mfcControl = mfcControl
+            #     flow = self.mfcControl.MFC1.get_measured_values()
                 
-                print('successfully connected to Brooks0254, read values = ', flow)
-            except (OSError,AttributeError) as e:
-                self.logger.exception(e)
+            #     print('successfully connected to Brooks0254, read values = ', flow)
+            # except (OSError,AttributeError) as e:
+            #     self.logger.exception(e)
             
             self.log_path = f'logs/CryoTest_{strftime('%Y%m%d-%H%M%S')}.csv'
             
