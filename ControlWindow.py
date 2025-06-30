@@ -344,6 +344,17 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.rxnTemp_grp,     10,3,5,1)
         layout.addWidget(self.rxnVac_grp,      15,3,5,1)
 
+    def closeEvent(self,event):
+        if self.testing:
+            print("trying to close gracefully")
+       
+        self.logger.info(f'Closing serial connections and GUI window.')
+        self.mks902._connection.close()
+        self.mks925._connection.close()
+        # self.b0254.connection.close_connection()
+        self.ls335.disconnect_usb()
+        event.accept()
+
 
 class BoxedPlot(qw.QWidget):
     def __init__(self, plot_title, color):
