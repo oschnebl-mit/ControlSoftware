@@ -109,12 +109,13 @@ class MainControlWindow(qw.QMainWindow):
                 print("Failed to connect to Brooks0254 MFC controller.")
             try:
                 self.ls335 = Model335(baud_rate=57600)
-                # self.setCryoButton.clicked.connect(self.change_cryo)
+                self.setCryoButton.clicked.connect(self.change_cryo)
             except:
                 self.ls335 = 'Model335'
                 print("Failed to connect to Lakeshore cryo controller.")
             try:
-                self.daq = DAQ(self.logger)
+                self.daq = DAQ(self.logger,self.testing)
+                self.testDAQButton.clicked.connect(self.daq.test_relay1)
             except:
                 self.daq = 'DAQ'
                 print("Failed to connect to DAQ")
@@ -127,12 +128,17 @@ class MainControlWindow(qw.QMainWindow):
         else:
             try:
                 self.ls335 = Model335(57600)
-                self.daq = DAQ(self.logger)
+                self.setCryoButton.clicked.connect(self.change_cryo)
+
                 self.mks902 = PressureGauge(self.logger,'COM3') 
                 self.mks925 = PressureGauge(self.logger,'COM5')
+
+                self.daq = DAQ(self.logger,self.testing)
+                self.testDAQButton.clicked.connect(self.daq.test_relay1)
+    
                 self.b0254 = Brooks0254('ASRL4::INSTR') ##  ## not set yet
 
-                self.setCryoButton.clicked.connect(self.change_cryo())
+                
             except OSError as e:
                 self.logger.exception(e)
 
@@ -293,10 +299,12 @@ class MainControlWindow(qw.QMainWindow):
         self.mfcButton = qw.QPushButton("Re-initialize MFCs")
         self.mks925Button = qw.QPushButton("Re-initialize MKS925 (Pirani)")
         self.mks902Button = qw.QPushButton("Re-initialize MKS902B (Piezo)")
+        self.testDAQButton = qw.QPushButton("Test DAQ Relay 1")
 
         self.processTree = ProcessTree()
 
         self.setCryoButton = qw.QPushButton("Change Cryo Setpoint")
+
         '''
         Some notes on the grid layout: 
         Because the buttons are small relative to the plots, the plots span many rows
@@ -318,7 +326,8 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.mfcButton,       0,0,1,1)
         layout.addWidget(self.mks925Button,    1,0,1,1)
         layout.addWidget(self.mks902Button,    2,0,1,1)
-        layout.addWidget(self.ctrlTree,        3,0,13,1)
+        layout.addWidget(self.testDAQButton,   3,0,1,1)
+        layout.addWidget(self.ctrlTree,        4,0,12,1)
 
         ## Top middle buttons and inputs (start at col 1, row 0)
         layout.addWidget(self.processTree,     0,1,10,1)
@@ -334,7 +343,7 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.doseH2Button,    6,2,1,1)
         # layout.addWidget(self.abortButton,     7,2,1,1)
         layout.addWidget(self.setCryoButton,   7,2,1,1)
-
+        
         ## current process plot middle bottom (start at row 8, col 1)
         layout.addWidget(self.currentProcessPlot_grp,10,1,10,2)
 
@@ -353,6 +362,7 @@ class MainControlWindow(qw.QMainWindow):
         self.mks925._connection.close()
         # self.b0254.connection.close_connection()
         self.ls335.disconnect_usb()
+        self.daq.close_connections()
         event.accept()
 
 

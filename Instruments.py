@@ -7,9 +7,9 @@ from threading import Lock
 
 class DAQ():
     '''Class for communicating with ni daq that controls relays'''
-    def __init__(self, logger):
+    def __init__(self, logger,testing):
         self.logger = logger
-        
+        self.testing = testing
         ## use nidaqmx Task() to create digital output channels (on/off relays)
         self.relay1 = nidaqmx.Task()
         self.relay1.do_channels.add_do_chan("Dev1/port0/line0")
@@ -32,6 +32,20 @@ class DAQ():
     def close_relay2(self):
         self.logger.info('Write False at relay 2 to close')
         self.relay2.write(False)
+
+    def test_relay1(self):
+        print("Testing relay 1")
+        self.open_relay1()
+        time.sleep(5)
+        self.close_relay1()
+
+    def close_connections(self):
+        ## closes tasks so resources can be re-allocated
+        self.relay1.close()
+        self.relay2.close()
+        if self.testing:
+            print("closing nidaqmx tasks")
+
 
 ''' Lakeshore docs on this specific model's python driver: https://lake-shore-python-driver.readthedocs.io/en/latest/model_335.html
 The sensors we have: 1x Curve Matched Silicon Diode sensor @ cooler tip (LS-DT-670B-SD)
