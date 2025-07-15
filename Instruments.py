@@ -12,10 +12,10 @@ class DAQ():
         self.testing = testing
         ## use nidaqmx Task() to create digital output channels (on/off relays)
         self.relay1 = nidaqmx.Task()
-        self.relay1.do_channels.add_do_chan("Dev1/port0/line0")
+        self.relay1.do_channels.add_do_chan("Dev1/port0/line1")
         self.relay2 = nidaqmx.Task()
-        self.relay2.do_channels.add_do_chan("Dev1/port0/line1")
-        logger.info('Initialized relays at "Dev1/port0/line0" and "Dev1/port0/line1"')
+        self.relay2.do_channels.add_do_chan("Dev1/port0/line2")
+        logger.info('Initialized relays at "Dev1/port0/line1" and "Dev1/port0/line2"')
 
     def open_relay1(self):
         self.logger.info('Write True at relay 1 to open')

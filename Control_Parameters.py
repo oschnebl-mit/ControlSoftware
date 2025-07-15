@@ -51,10 +51,10 @@ class CtrlParamTree(ParameterTree):
         self.p = Parameter.create(name='self.params',type='group',children=self.params)
         self.setParameters(self.p,showTop=False)
         
-        self.p.sigTreeStateChanged.connect(self.emitChange)
+    #     self.p.sigTreeStateChanged.connect(self.emitChange)
 
-    def emitChange(self,param,changes):
-        self.paramChange.emit(param,changes)
+    # def emitChange(self,param,changes):
+    #     self.dataChanged.emit(param,changes)
 
     def getMFCParamValue(self,mfc_no,child):
         # print(self.p.param('MFC Setup Parameters','MFC 3 Setup Parameters','Gas Factor').value())

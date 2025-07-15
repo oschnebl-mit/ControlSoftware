@@ -32,6 +32,13 @@ class DAQ():
         self.logger.info('Write False at relay 2 to close')
         self.relay2.write(False)
 
+    def close_connections(self):
+        ## closes tasks so resources can be re-allocated
+        self.relay1.close()
+        self.relay2.close()
+        
+
+
 if __name__ == "__main__":
     # import pyvisa # if not demoMode
     timestr = t.strftime('%Y%m%d-%H%M%S')
@@ -43,3 +50,4 @@ if __name__ == "__main__":
     testdaq.open_relay1()
     t.sleep(5)
     testdaq.close_relay1()
+    testdaq.close_connections()

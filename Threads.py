@@ -95,7 +95,8 @@ class LoggingThread(QtCore.QThread):
                     self.new_rxn_pressure_data.emit(1*rng.random())
                     self.new_cryo_pressure_data.emit(0.1*rng.random())
             else:
-                [cryo_temp, rxn_temp] = self.cryoControl.get_all_kelvin_reading()
+                cryo_temp = float(self.cryoControl.query('KRDG? A',check_errors=False))
+                rxn_temp = float(self.cryoControl.query("KRDG? B", check_errors=False))
                 log_dict = {
                     'Reaction Pressure':self.rxnPressure.get_pressure(),
                     'Cryo Pressure':self.cryoPressure.get_pressure(),

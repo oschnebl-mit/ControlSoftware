@@ -75,6 +75,25 @@ class MainControlWindow(qw.QMainWindow):
             print('start logging')
             self.logging_thread.start()
 
+    def toggle_relay1(self):
+        if self.testDAQ1Button.isChecked:
+            print('relay1 is open, closing relay')
+            self.daq.close_relay1()
+            self.testDAQ1Button.setChecked(False)
+        else:
+            print('relay1 is closed, opening relay')
+            self.daq.open_relay1()
+            self.testDAQ1Button.setChecked(True)
+
+    def toggle_relay2(self):
+        if self.testDAQ2Button.isChecked:
+            print('relay2 is open, closing relay')
+            self.daq.close_relay2()
+        else:
+            print('relay2 is closed, opening relay')
+            self.daq.open_relay2()
+
+
     def updateLogInterval(self):
         self.logging_delay = int(self.logInput.text())
         self.logging_thread.delay = self.logging_delay
@@ -102,7 +121,7 @@ class MainControlWindow(qw.QMainWindow):
                 self.mks902 = 'MKS902'
                 print("Failed to connect to MKS902 gauge.")
             try:
-                self.b0254 = Brooks0254(self.logger,    'ASRL4::INSTR') ## 
+                self.b0254 = Brooks0254(self.logger,    'ASRL8::INSTR') ## 
                 self.mfcButton.clicked.connect(self.setupMFCs)
             except:
                 self.b0254 = 'Brooks0254'
@@ -115,7 +134,7 @@ class MainControlWindow(qw.QMainWindow):
                 print("Failed to connect to Lakeshore cryo controller.")
             try:
                 self.daq = DAQ(self.logger,self.testing)
-                self.testDAQButton.clicked.connect(self.daq.test_relay1)
+                self.testDAQ1Button.clicked.connect(self.toggle_relay1)
             except:
                 self.daq = 'DAQ'
                 print("Failed to connect to DAQ")
@@ -134,9 +153,11 @@ class MainControlWindow(qw.QMainWindow):
                 self.mks925 = PressureGauge(self.logger,'COM5')
 
                 self.daq = DAQ(self.logger,self.testing)
-                self.testDAQButton.clicked.connect(self.daq.test_relay1)
+                self.testDAQ1Button.clicked.connect(self.toggle_relay1)
+                self.testDAQ2Button.clicked.connect(self.toggle_relay2)
     
-                self.b0254 = Brooks0254('ASRL4::INSTR') ##  ## not set yet
+                self.b0254 = Brooks0254(self.logger, 'ASRL8::INSTR') ## 
+                self.mfcButton.clicked.connect(self.setupMFCs)
 
                 
             except OSError as e:
@@ -299,7 +320,12 @@ class MainControlWindow(qw.QMainWindow):
         self.mfcButton = qw.QPushButton("Re-initialize MFCs")
         self.mks925Button = qw.QPushButton("Re-initialize MKS925 (Pirani)")
         self.mks902Button = qw.QPushButton("Re-initialize MKS902B (Piezo)")
-        self.testDAQButton = qw.QPushButton("Test DAQ Relay 1")
+        self.testDAQ1Button = qw.QPushButton("Toggle DAQ Relay 1")
+        self.testDAQ1Button.setCheckable(True)
+        self.testDAQ1Button.setChecked(False)
+        self.testDAQ2Button = qw.QPushButton("Toggle DAQ Relay 2")
+        self.testDAQ2Button.setCheckable(True)
+        self.testDAQ2Button.setChecked(False)
 
         self.processTree = ProcessTree()
 
@@ -326,8 +352,9 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.mfcButton,       0,0,1,1)
         layout.addWidget(self.mks925Button,    1,0,1,1)
         layout.addWidget(self.mks902Button,    2,0,1,1)
-        layout.addWidget(self.testDAQButton,   3,0,1,1)
-        layout.addWidget(self.ctrlTree,        4,0,12,1)
+        layout.addWidget(self.testDAQ1Button,  3,0,1,1)
+        layout.addWidget(self.testDAQ2Button,  4,0,1,1)
+        layout.addWidget(self.ctrlTree,        5,0,12,1)
 
         ## Top middle buttons and inputs (start at col 1, row 0)
         layout.addWidget(self.processTree,     0,1,10,1)
@@ -452,7 +479,7 @@ if __name__ == "__main__":
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
 
-    window = MainControlWindow(logger = logger, testing = True)
+    window = MainControlWindow(logger = logger, testing = False)
     
     sys.exit(app.exec())
 
