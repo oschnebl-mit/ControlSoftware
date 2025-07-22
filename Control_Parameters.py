@@ -82,7 +82,7 @@ class ProcessTree(ParameterTree):
                 {'name':'Timeout (min)','type':'int','value':1},
                 {'name':'Logging Interval (s)','type':'int','value':1}
          ]},
-            {'name':'Dose H2S','type':'group','children':[
+            {'name':'Dose Ar','type':'group','children':[
                 {'name':'Batch Volume','type':'float','value':1},
                 {'name':'Batch Rate','type':'float','value':1},
                 {'name':'Cut-off Pressure','type':'float','value':1}
@@ -125,6 +125,9 @@ class ProcessTree(ParameterTree):
 
     def getH2SDoseValue(self,child):
         return self.p.param('Dose H2S',child).value()
+    
+    def getArDoseValue(self,child):
+        return self.p.param('Dose Ar',child).value()
 
     def getH2DoseValue(self,child):
         return self.p.param('Dose H2',child).value()

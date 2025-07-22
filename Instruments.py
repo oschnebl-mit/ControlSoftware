@@ -11,19 +11,37 @@ class DAQ():
         self.logger = logger
         self.testing = testing
         ## use nidaqmx Task() to create digital output channels (on/off relays)
+        self.relay0 = nidaqmx.Task()
+        self.relay0.do_channels.add_do_chan("Dev1/port0/line0")
         self.relay1 = nidaqmx.Task()
         self.relay1.do_channels.add_do_chan("Dev1/port0/line1")
         self.relay2 = nidaqmx.Task()
         self.relay2.do_channels.add_do_chan("Dev1/port0/line2")
-        logger.info('Initialized relays at "Dev1/port0/line1" and "Dev1/port0/line2"')
+        logger.info('Initialized relays at "Dev1/port0/line0" and "Dev1/port0/line1" and "Dev1/port0/line2"')
+
+        self.relay0.isopen = False
+        self.relay1.isopen = True
+        self.relay2.isopen = True
+
+    def open_relay0(self):
+        self.logger.info('Write True at relay 0 to open')
+        self.relay0.write(True)
+        self.relay0.isopen = True
+    
+    def close_relay0(self):
+        self.logger.info('Write False at relay 0 to close')
+        self.relay0.write(False)
+        self.relay0.isopen = False
 
     def open_relay1(self):
         self.logger.info('Write True at relay 1 to open')
         self.relay1.write(True)
+        self.relay1.isopen = True
     
     def close_relay1(self):
         self.logger.info('Write False at relay 1 to close')
         self.relay1.write(False)
+        self.relay1.isopen = False
 
     def open_relay2(self):
         self.logger.info('Write True at relay 2 to open')
@@ -41,6 +59,7 @@ class DAQ():
 
     def close_connections(self):
         ## closes tasks so resources can be re-allocated
+        self.relay0.close()
         self.relay1.close()
         self.relay2.close()
         if self.testing:
@@ -382,6 +401,42 @@ class MassFlowController:
         command = f'AZ{self._address}.{self._outputPort}F*' # start channel batch
         with self.com_lock:
             response = self._connection.query(command).split(sep=",")
+        return response
+    
+    def run_batch(self,batch_volume,batch_rate):
+        ### differs from start batch in that this function waits for "DONE" signal
+        ### competing thread would just ask for a measurement, so it would be fine to interleave
+        ## program SP function to batch, SP Rate to desired rate, SP Batch to desired quantity, then start batch
+        self.program_output_value('SP_Function','2')
+        self.program_output_value('SP_Batch',batch_volume)
+        self.program_output_value('SP_Rate',batch_rate)
+        command = f'AZ{self._address}.{self._outputPort}F*' # start channel batch
+        with self.com_lock:
+            self._connection.write(command)
+            response = self._connection.readline()
+            while 'OK' in response:
+                time.wait(1)
+                response = self.connection.readline()
+                
+        return response
+    
+    def practice_batch(self,batch_volume,batch_rate):
+        ## want to test code
+        ### differs from start batch in that this function waits for "DONE" signal
+        ### competing thread would just ask for a measurement, so it would be fine to interleave
+        ## program SP function to batch, SP Rate to desired rate, SP Batch to desired quantity, then start batch
+        # self.program_output_value('SP_Function','2')
+        # self.program_output_value('SP_Batch',batch_volume)
+        # self.program_output_value('SP_Rate',batch_rate)
+        command = f'AZ{self._address}I' # start channel batch
+        with self.com_lock:
+            self._connection.write(command)
+            response = self._connection.readline()
+            while 'BROOKS' in response:
+                time.wait(10)
+                response = self.connection.readline()
+                print(response)
+                
         return response
     
     def valve_override(self,value):
