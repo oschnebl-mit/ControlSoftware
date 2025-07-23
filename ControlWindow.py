@@ -35,12 +35,11 @@ class MainControlWindow(qw.QMainWindow):
 
 
         if self.testing:
-    
-            # self.dummy = DummyThread(delay = 3000)
-            # self.dummy.newData.connect(self.cryoVac_grp.update_plot)
-            # self.dummy.start()
+
 
             self.initThreads()
+
+            self.mfcButton.clicked.connect(self.setupMFCs)
 
         else:
             self.initThreads()
@@ -76,14 +75,14 @@ class MainControlWindow(qw.QMainWindow):
             self.logging_thread.start()
 
     def toggle_relay1(self):
-        if self.testDAQ1Button.isChecked:
+        if self.daq.relay1open:
             print('relay1 is open, closing relay')
             self.daq.close_relay1()
-            self.testDAQ1Button.setChecked(False)
+            # self.testDAQ1Button.setChecked(False)
         else:
             print('relay1 is closed, opening relay')
             self.daq.open_relay1()
-            self.testDAQ1Button.setChecked(True)
+            # self.testDAQ1Button.setChecked(True)
 
     def toggle_relay2(self):
         if self.testDAQ2Button.isChecked:
@@ -133,8 +132,8 @@ class MainControlWindow(qw.QMainWindow):
                 self.ls335 = 'Model335'
                 print("Failed to connect to Lakeshore cryo controller.")
             try:
-                self.daq = DAQ(self.logger,self.testing)
                 self.testDAQ1Button.clicked.connect(self.toggle_relay1)
+                self.daq = DAQ(self.logger,self.testing)
             except:
                 self.daq = 'DAQ'
                 print("Failed to connect to DAQ")
@@ -234,11 +233,7 @@ class MainControlWindow(qw.QMainWindow):
         self.ls335.set_control_setpoint(loop, setpoint)
         self.logger.info(f'Setting cryostat loop {loop} to {setpoint} K at rate of {ramp_rate} K/min')
 
-    
-    def sendDemoSignal(self):
-        # Testing out thread functon
-        self.nadt.setpoint = float(self.tempInput.text())
-        self.nadt.updateCryoSetpoint()
+
 
     def setupMKS925(self):
         ## function intended to troubleshoot connection to pressure gauge from within gui
@@ -259,11 +254,22 @@ class MainControlWindow(qw.QMainWindow):
     def setupMFCs(self):
         for i in range(3):
             gas_factor = self.ctrlTree.getMFCParamValue(i+1,'Gas Factor')
-            rate_units = self.ctrlTree.getMFCParamValue(i+1,'Rate Units')
-            time_base = self.ctrlTree.getMFCParamValue(i+1,'Time Base')
+            rate_units_str = self.ctrlTree.getMFCParamValue(i+1,'Rate Units')
+            time_base_str = self.ctrlTree.getMFCParamValue(i+1,'Time Base')
             decimal_point = self.ctrlTree.getMFCParamValue(i+1,'Decimal Point')
             func = self.ctrlTree.getMFCParamValue(i+1,'SP Function')
-            self.b0254.MFC_list[i].setup_MFC(gas_factor,rate_units,time_base,decimal_point,func)
+            if self.testing:
+                print(f'Try to program MFC{i+1} with gas factor {gas_factor}, rate units {rate_units_str},time base {time_base_str}, decimal point {decimal_point}, and SP function {func}')
+                try:
+                    rate_units = self.b0254.MEASUREMENT_UNITS[rate_units_str]
+                    time_base = self.b0254.RATE_TIME_BASE[time_base_str]
+                    self.b0254.MFC_list[i].setup_MFC(gas_factor,rate_units,time_base,decimal_point,func)
+                except:
+                    print('Failed to program MFC')
+            else:
+                rate_units = self.b0254.MEASUREMENT_UNITS[rate_units_str]
+                time_base = self.b0254.RATE_TIME_BASE[time_base_str]
+                self.b0254.MFC_list[i].setup_MFC(gas_factor,rate_units,time_base,decimal_point,func)
 
     def initUI(self):
         ### # Dedicated colors which look "good"
@@ -322,10 +328,10 @@ class MainControlWindow(qw.QMainWindow):
         self.mks902Button = qw.QPushButton("Re-initialize MKS902B (Piezo)")
         self.testDAQ1Button = qw.QPushButton("Toggle DAQ Relay 1")
         self.testDAQ1Button.setCheckable(True)
-        self.testDAQ1Button.setChecked(False)
+        # self.testDAQ1Button.setChecked(False)
         self.testDAQ2Button = qw.QPushButton("Toggle DAQ Relay 2")
         self.testDAQ2Button.setCheckable(True)
-        self.testDAQ2Button.setChecked(False)
+        # self.testDAQ2Button.setChecked(False)
 
         self.processTree = ProcessTree()
 
@@ -479,7 +485,7 @@ if __name__ == "__main__":
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
 
-    window = MainControlWindow(logger = logger, testing = False)
+    window = MainControlWindow(logger = logger, testing = True)
     
     sys.exit(app.exec())
 

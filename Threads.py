@@ -35,16 +35,14 @@ class LoggingThread(QtCore.QThread):
                 self.logger.exception(e)
             try:
                 self.rxnPressure = rxnGauge
-                # self.rxnPressure.test()
                 pressure = self.rxnPressure.get_pressure()
-                # self.new_rxn_pressure_data.emit(pressure)
                 print('successfully connected to MKS902 piezo, read pressure = ', pressure)
             except (OSError, AttributeError) as e:
                 self.logger.exception(e)
             try:
                 self.cryoPressure = cryoGauge
                 # self.cryoPressure.test()
-                pressure = self.cryoressure.get_pressure()
+                pressure = self.cryoPressure.get_pressure()
                 # self.new_cryo_pressure_data.emit(pressure)
                 print('successfully connected to MKS925 pirani, read pressure = ', pressure)
             except (OSError, AttributeError) as e:
@@ -56,8 +54,8 @@ class LoggingThread(QtCore.QThread):
             #     print('successfully connected to Brooks0254, read values = ', flow)
             # except (OSError,AttributeError) as e:
             #     self.logger.exception(e)
-            
-            self.log_path = f'logs/CryoTest_{strftime('%Y%m%d-%H%M%S')}.csv'
+            timestr = strftime('%Y%m%d-%H%M%S')
+            self.log_path = f'logs/CryoTest_{timestr}.csv'
             
         self.running = False
 

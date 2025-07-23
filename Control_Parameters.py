@@ -11,22 +11,22 @@ class CtrlParamTree(ParameterTree):
             {'name':'MFC Setup Parameters', 'type':'group','children':[
                 {'name':'MFC 1 Setup Parameters', 'type':'group','children':[
                 {'name':'Gas Factor','type':'float','value':1.39},
-                {'name':'Rate Units','type':'int','value':18},
-                {'name':'Time Base','type':'list','limits':['sec','min','hrs','day']},
+                {'name':'Rate Units','type':'list','limits':['scc','ml']},
+                {'name':'Time Base','type':'list','limits':['min','hrs','sec','day']},
                 {'name':'Decimal Point','type':'int','value':1},
                 {'name':'SP Function','type':'list','limits':['RATE','BATCH']}
                 ]},
                 {'name':'MFC 2 Setup Parameters', 'type':'group','children':[
                 {'name':'Gas Factor','type':'float','value':1.0},
-                {'name':'Rate Units','type':'int','value':18},
-                {'name':'Time Base','type':'list','limits':['sec','min','hrs','day']},
+                {'name':'Rate Units','type':'list','limits':['scc','ml']},
+                {'name':'Time Base','type':'list','limits':['min','hrs','sec','day']},
                 {'name':'Decimal Point','type':'int','value':1},
                 {'name':'SP Function','type':'list','limits':['RATE','BATCH']}
                 ]},
                 {'name':'MFC 3 Setup Parameters', 'type':'group','children':[
                 {'name':'Gas Factor','type':'float','value':0.84},
-                {'name':'Rate Units','type':'int','value':18},
-                {'name':'Time Base','type':'list','limits':['sec','min','hrs','day']},
+                {'name':'Rate Units','type':'list','limits':['scc','ml']},
+                {'name':'Time Base','type':'list','limits':['min','hrs','sec','day']},
                 {'name':'Decimal Point','type':'int','value':1},
                 {'name':'SP Function','type':'list','limits':['RATE','BATCH']}
                 ]},

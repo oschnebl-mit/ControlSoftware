@@ -11,27 +11,49 @@ class DAQ():
         self.logger = logger
         self.testing = testing
         ## use nidaqmx Task() to create digital output channels (on/off relays)
-        self.relay1 = nidaqmx.Task()
-        self.relay1.do_channels.add_do_chan("Dev1/port0/line1")
-        self.relay2 = nidaqmx.Task()
-        self.relay2.do_channels.add_do_chan("Dev1/port0/line2")
-        logger.info('Initialized relays at "Dev1/port0/line1" and "Dev1/port0/line2"')
+        if self.testing:
+            try:
+                self.relay1 = nidaqmx.Task()
+                self.relay1.do_channels.add_do_chan("Dev1/port0/line1")
+                self.relay2 = nidaqmx.Task()
+                self.relay2.do_channels.add_do_chan("Dev1/port0/line2")
+                logger.info('Initialized relays at "Dev1/port0/line1" and "Dev1/port0/line2"')
+                self.virtual = False
+            except:
+                self.virtual = True
+                logger.info('Failed to initialize DAQ relays')
+        else:
+            self.virtual = False
+            self.relay1 = nidaqmx.Task()
+            self.relay1.do_channels.add_do_chan("Dev1/port0/line1")
+            self.relay2 = nidaqmx.Task()
+            self.relay2.do_channels.add_do_chan("Dev1/port0/line2")
+            logger.info('Initialized relays at "Dev1/port0/line1" and "Dev1/port0/line2"')
+
+        self.relay1open = False
+        self.relay2open = False
 
     def open_relay1(self):
         self.logger.info('Write True at relay 1 to open')
-        self.relay1.write(True)
+        if not self.virtual:
+            self.relay1.write(True)
+        self.relay1open = True
     
     def close_relay1(self):
         self.logger.info('Write False at relay 1 to close')
-        self.relay1.write(False)
+        if not self.virtual:
+            self.relay1.write(False)
+        self.relay1open = False
 
     def open_relay2(self):
         self.logger.info('Write True at relay 2 to open')
         self.relay2.write(True)
+        self.relay2open = True
     
     def close_relay2(self):
         self.logger.info('Write False at relay 2 to close')
         self.relay2.write(False)
+        self.relay2open = False
 
     def test_relay1(self):
         print("Testing relay 1")
@@ -41,8 +63,9 @@ class DAQ():
 
     def close_connections(self):
         ## closes tasks so resources can be re-allocated
-        self.relay1.close()
-        self.relay2.close()
+        if not self.virtual:
+            self.relay1.close()
+            self.relay2.close()
         if self.testing:
             print("closing nidaqmx tasks")
 
@@ -168,6 +191,65 @@ class PressureGauge:
 class Brooks0254:
     '''Object that holds the pyvisa connection to Brooks0254 MFC controller and handles communication with it'''
 
+    MEASUREMENT_UNITS = dict({
+        "ml": 0,
+        "mls": 1,
+        "mln": 2,
+        "l": 3,
+        "ls": 4,
+        "ln": 5,
+        "cm^3": 6,
+        "cm^3s": 7,
+        "cm^3n": 8,
+        "m^3": 9,
+        "m^3s": 10,
+        "m^3n": 11,
+        "g": 12,
+        "lb": 13,
+        "kg": 14,
+        "ft^3": 15,
+        "ft^3s": 16,
+        "ft^3n": 17,
+        "scc": 18,
+        "sl": 19,
+        "bar": 20,
+        "mbar": 21,
+        "psi": 22,
+        "kPa": 23,
+        "Torr": 24,
+        "atm": 25,
+        "Volt": 26,
+        "mA": 27,
+        "oC": 28,
+        "oK": 29,
+        "oR": 30,
+        "oF": 31,
+        "g/cc": 32,
+        "sg": 33,
+        "%": 34,
+        "lb/in^3": 35,
+        "lb/ft^3": 36,
+        "lb/gal": 37,
+        "kg/m^3": 38,
+        "g/ml": 39,
+        "kg/l": 40,
+        "g/l": 41
+    })
+
+    # Base time units
+    RATE_TIME_BASE = dict({
+        "sec": 1,
+        "min": 2,
+        "hrs": 3,
+        "day": 4
+    })
+
+    SP_FUNCTION = {
+        'rate': 1,
+        'batch': 2,
+        'blend': 3
+    }
+    
     def __init__(self, logger, instrument, deviceAddress='29751'):
         '''
         pyvisaConnection = pyvisa.ResourceManager().open_resource()
@@ -280,7 +362,7 @@ class MassFlowController:
         self.program_input_value('Decimal_Point',decimal_point)
         self.program_input_value('Gas_Factor',gas_factor)
 
-        print(response)
+        print('Successfully programmed MFC input values, received following response', response)
 
 
     def get_measured_values(self):

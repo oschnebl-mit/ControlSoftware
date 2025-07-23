@@ -24,15 +24,20 @@ Input_Program_Values = {
 
 class Brooks0254:
 
-    def __init__(self, pyvisaConnection, deviceAddress=None):
+    def __init__(self, testing, pyvisaConnection, deviceAddress=None):
         '''
         pyvisaConnection = pyvisa.ResourceManager().open_resource()
         MFCs: list of str naming the gases being controlled
         deviceAddress: str of len 5
         
         '''
-        self.__connection = pyvisaConnection
+        self.testing = testing
+        if self.testing:
+            self.__connection = None
+        else:
+            self.__connection = pyvisaConnection
         self.__address = deviceAddress
+        
 
         self.MFC1 = None
         self.MFC2 = None
@@ -40,21 +45,21 @@ class Brooks0254:
 
         self.MFC_list = []
 
-        self.MFC1 = MassFlowController(channel=1,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
+        self.MFC1 = MassFlowController(channel=1,testing=self.testing,pyvisaConnection=self.__connection,deviceAddress=self.__address)
         # self.MFC1.setup_MFC()
 
-        for n in range(1,4):
-            try:
-                newMFC = MassFlowController(channel = n,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
-                self.MFC_list.append(newMFC)
-            except pyvisa.errors.VisaIOError as vioe:
-                print(f"Error while creating controller {n}: {vioe}")
+        # for n in range(1,4):
+        #     try:
+        #         newMFC = MassFlowController(channel = n,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
+        #         self.MFC_list.append(newMFC)
+        #     except pyvisa.errors.VisaIOError as vioe:
+        #         print(f"Error while creating controller {n}: {vioe}")
 
-        for n, MFC in enumerate(self.MFC_list,start=1):
-            MFC.setup_MFC()
+        # for n, MFC in enumerate(self.MFC_list,start=1):
+        #     MFC.setup_MFC()
     
     def setupMFCs(self,gf):
-        '''Currently just sets the gas factor to a value from the parameter tree'''
+        '''Currently unused, using MFCx.setup_MFC() in ControlWindow'''
         for n, MFC in enumerate(self.MFC_list,start=1):
             MFC.setup_MFC(gas_factor=gf[n-1],rate_units=18,time_base=2,decimal_point=1, SP_func = 1)
 
@@ -172,7 +177,7 @@ class MassFlowController:
         'blend': 3
     }
 
-    def __init__(self,channel,pyvisaConnection,deviceAddress=''):
+    def __init__(self,testing, channel,pyvisaConnection,deviceAddress=''):
         '''
         Channel refers to each MFC (different gases)
         input for channel 1 = 1, output for channel 1 = 2
@@ -180,6 +185,7 @@ class MassFlowController:
         channels 3 and 4 follow the same pattern (odds in, evens out)
         channel 9 is global
         '''
+        self.testing = testing
         # Addressing parameters
         self.channel = channel
         self.__inputPort = 2 * channel - 1
@@ -187,23 +193,28 @@ class MassFlowController:
         self.__address: str = deviceAddress  # this is a string because it needs to be zero-padded to be 5 chars long
 
         # PyVisa connection
-        self.__connection: pyvisa = pyvisaConnection
+        if self.testing:
+            self.__connection = None
+        else:
+            self.__connection: pyvisa = pyvisaConnection
 
 
     def setup_MFC(self,gas_factor=1,rate_units=18,time_base=2,decimal_point=1, SP_func = 1):
         ''' 
-        GAS_FACTOR TODO
+        GAS_FACTOR:
         rate_units: scc = 18, cm^3 = 6, cm^3s = 7, cm^3n = 8, sl = 19, ml = 0 (plus others)
         time_base: sec = 1, min = 2, hrs = 3, day = 4 
         decimal point: 0 = xxx. , 1 = xx.x , 2 = x.xx , 3 = .xxx 
         SP Func: rate = 1, batch = 2, blend = 3
         '''
-        response = self.program_input_value('Measure_Units',rate_units)
+        
+
+        self.program_input_value('Measure_Units',rate_units)
         self.program_input_value('Time_Base',time_base)
         self.program_input_value('Decimal_Point',decimal_point)
         self.program_input_value('Gas_Factor',gas_factor)
 
-        print(response)
+        # print(response)
 
 
     def get_measured_values(self):
@@ -259,7 +270,9 @@ class MassFlowController:
             return 'Error: not an output parameter'
         else:
             pcode = Output_Program_Values[param] # this is a string
-            command = f'AZ{self.__address}.{self.__outputPort}P{pcode}={value}'
+            command = f'AZ{self.__address}.0{self.__outputPort}P{pcode}={value}'
+            if self.testing:
+                print(command)
             response = self.__connection.query(command).split(sep=',')
             return response
 
@@ -271,9 +284,14 @@ class MassFlowController:
             return 'Error: not an output parameter'
         else:
             pcode = Input_Program_Values[param] # this is a 2 chr string
-            command = f'AZ{self.__address}.{self.__inputPort}P{pcode}={value}'
-            response = self.__connection.query(command).split(sep=',')
-            return response
+            command = f'AZ{self.__address}.0{self.__inputPort}P{pcode}={value}'
+            if self.testing:
+                print(command)
+            try:
+                response = self.__connection.query(command).split(sep=',')
+                return response
+            except:
+                print('Failed to connect, no response')
 
     def read_programmed_value(self,param,value):
         '''
@@ -309,6 +327,7 @@ class MassFlowController:
 # print(t2.read_value(0x04))
 
 if __name__ == "__main__":
-    rm = pyvisa.ResourceManager()
-    brooks = rm.open_resource('ASRL8::INSTR',read_termination='\r',write_termination='\r')
-    brooks4channel = Brooks0254(brooks, deviceAddress='29751')
+    # rm = pyvisa.ResourceManager()
+    # brooks = rm.open_resource('ASRL8::INSTR',read_termination='\r',write_termination='\r')
+    brooks4channel = Brooks0254(testing=True,pyvisaConnection=None, deviceAddress='29751')
+    brooks4channel.MFC1.setup_MFC(gas_factor=1.0,rate_units=18,time_base=2,decimal_point=1, SP_func = 1)
