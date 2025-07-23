@@ -292,6 +292,9 @@ if __name__ == "__main__":
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
 
-    window = SimpleControlWindow(logger = logger)
+    # window = SimpleControlWindow(logger = logger)
     
-    sys.exit(app.exec())
+    # sys.exit(app.exec())
+
+    gas_factor = 1.0
+    print(f'{gas_factor:0<5}')

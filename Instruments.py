@@ -7,12 +7,14 @@ from threading import Lock
 
 class DAQ():
     '''Class for communicating with ni daq that controls relays'''
-    def __init__(self, logger,testing):
+    def __init__(self, testing, logger):
         self.logger = logger
         self.testing = testing
         ## use nidaqmx Task() to create digital output channels (on/off relays)
         if self.testing:
             try:
+                self.relay0 = nidaqmx.Task()
+                self.relay0.do_channels.add_do_chan("Dev1/port0/line0")
                 self.relay1 = nidaqmx.Task()
                 self.relay1.do_channels.add_do_chan("Dev1/port0/line1")
                 self.relay2 = nidaqmx.Task()
@@ -24,26 +26,35 @@ class DAQ():
                 logger.info('Failed to initialize DAQ relays')
         else:
             self.virtual = False
+            self.relay0 = nidaqmx.Task()
+            self.relay0.do_channels.add_do_chan("Dev1/port0/line0")
             self.relay1 = nidaqmx.Task()
             self.relay1.do_channels.add_do_chan("Dev1/port0/line1")
             self.relay2 = nidaqmx.Task()
             self.relay2.do_channels.add_do_chan("Dev1/port0/line2")
             logger.info('Initialized relays at "Dev1/port0/line1" and "Dev1/port0/line2"')
 
-        self.relay1open = False
-        self.relay2open = False
+    def open_relay0(self):
+        self.logger.info('Write True at relay 0 to open')
+        if not self.virtual:
+            self.relay0.write(True)
+            
+    def close_relay0(self):
+        self.logger.info('Write False at relay 0 to close')
+        if not self.virtual:
+            self.relay0.write(False)
 
     def open_relay1(self):
         self.logger.info('Write True at relay 1 to open')
         if not self.virtual:
             self.relay1.write(True)
-        self.relay1open = True
+        
     
     def close_relay1(self):
         self.logger.info('Write False at relay 1 to close')
         if not self.virtual:
             self.relay1.write(False)
-        self.relay1open = False
+
 
     def open_relay2(self):
         self.logger.info('Write True at relay 2 to open')
@@ -64,6 +75,7 @@ class DAQ():
     def close_connections(self):
         ## closes tasks so resources can be re-allocated
         if not self.virtual:
+            self.relay0.close()
             self.relay1.close()
             self.relay2.close()
         if self.testing:
@@ -106,17 +118,27 @@ class PressureGauge:
     Object that holds the serial communication for a pressure gauge
     '''
 
-    def __init__(self, logger,com_port,deviceAddress='254'):
+    def __init__(self,testing,logger,com_port,deviceAddress='254'):
         '''com_port (e.g. 'COM3') and device Address is string of 3 ints
         '''
-        # self._connection: pyvisa = pyvisa.ResourceManager().open_resource(instrument) # read/write terminations?
-        self._connection = serial.Serial(port=com_port,baudrate=9600,parity=serial.PARITY_NONE,bytesize=8,stopbits=serial.STOPBITS_ONE,timeout=1)
-        self._address: str = deviceAddress
+        self.testing = testing
         self.logger = logger
-        self.com_lock = Lock()
-        # if self._address == None:
-        #     newaddress = self._ask_address()
-        #     self._address = newaddress[6:8] ## might need to decode or string-ify
+        if not self.testing:
+            self._connection = serial.Serial(port=com_port,baudrate=9600,parity=serial.PARITY_NONE,bytesize=8,stopbits=serial.STOPBITS_ONE,timeout=1)
+            self._address: str = deviceAddress
+            self.logger = logger
+            self.com_lock = Lock()
+            self.virtual = False
+        elif self.testing:
+            try:
+                self._connection = serial.Serial(port=com_port,baudrate=9600,parity=serial.PARITY_NONE,bytesize=8,stopbits=serial.STOPBITS_ONE,timeout=1)
+                self._address: str = deviceAddress
+                self.logger = logger
+                self.com_lock = Lock()
+                self.virtual = False
+            except:
+                self.virtual = True
+
 
     def _ask_address(self):
         ''' function to get address of specific pressure gauge. 254 addresses all devices on port.
@@ -250,21 +272,34 @@ class Brooks0254:
         'blend': 3
     }
     
-    def __init__(self, logger, instrument, deviceAddress='29751'):
+    def __init__(self,testing, logger, instrument, deviceAddress='29751'):
         '''
         pyvisaConnection = pyvisa.ResourceManager().open_resource()
         MFCs: list of str naming the gases being controlled
         deviceAddress: str of len 5
+
+        As if July 2025, MFCs are installed, H2S is top, Ar is middle, H2 is bottom,
+        Let's call H2S = MFC1, Ar = MFC2, H2 = MFC3
         
         '''
-        self._connection = pyvisa.ResourceManager().open_resource(instrument)
-        self._address = deviceAddress
         self.logger = logger
-        
+        self.testing = testing
+        if self.testing:
+            try:
+                self._connection = pyvisa.ResourceManager().open_resource(instrument)
+                self._address = deviceAddress
+                self.virtual = False
+            except:
+                self.virtual = True
+                self.logger.info('Failed to initialize Brooks 0254')
+        else:
+            self._connection = pyvisa.ResourceManager().open_resource(instrument)
+            self._address = deviceAddress
+            self.virtual = False
 
-        self.MFC1 = MassFlowController(channel=1,pyvisaConnection=self._connection,deviceAddress=self._address)
-        self.MFC2 = MassFlowController(channel=2,pyvisaConnection=self._connection,deviceAddress=self._address)
-        self.MFC3 = MassFlowController(channel=3,pyvisaConnection=self._connection,deviceAddress=self._address)
+        self.MFC1 = MassFlowController(self.logger,channel=1,pyvisaConnection=self._connection,deviceAddress=self._address,virtual=self.virtual)
+        self.MFC2 = MassFlowController(self.logger,channel=2,pyvisaConnection=self._connection,deviceAddress=self._address,virtual=self.virtual)
+        self.MFC3 = MassFlowController(self.logger,channel=3,pyvisaConnection=self._connection,deviceAddress=self._address,virtual=self.virtual)
 
         self.MFC_list = [self.MFC1,self.MFC2, self.MFC3]
 
@@ -331,7 +366,7 @@ class MassFlowController:
         'PV_Full_Scale':'09'
     }
 
-    def __init__(self,channel,pyvisaConnection,deviceAddress=''):
+    def __init__(self,logger,channel,pyvisaConnection,deviceAddress='',virtual=False):
         '''
         Channel refers to each MFC (different gases)
         input for channel 1 = 1, output for channel 1 = 2
@@ -345,8 +380,11 @@ class MassFlowController:
         self._outputPort = 2 * channel
         self._address: str = deviceAddress  # this is a string because it needs to be zero-padded to be 5 chars long
         self.com_lock = Lock()
+        self.virtual = virtual
+        self.logger = logger
         # PyVisa connection
-        self._connection: pyvisa = pyvisaConnection
+        if not self.virtual:
+            self._connection: pyvisa = pyvisaConnection
 
 
     def setup_MFC(self,gas_factor=1,rate_units=18,time_base=2,decimal_point=1, SP_func = 1):
@@ -360,9 +398,9 @@ class MassFlowController:
         response = self.program_input_value('Measure_Units',rate_units)
         self.program_input_value('Time_Base',time_base)
         self.program_input_value('Decimal_Point',decimal_point)
-        self.program_input_value('Gas_Factor',gas_factor)
+        self.program_input_value('Gas_Factor',f'{gas_factor:0<5}') ## format gas factor so it always has 4 sig figs
 
-        print('Successfully programmed MFC input values, received following response', response)
+        self.logger.info('Successfully programmed MFC input values, received following response', response)
 
 
     def get_measured_values(self):
@@ -372,12 +410,17 @@ class MassFlowController:
         Returns current process value, totalizer value, and datetime
         '''
         command = f'AZ{self._address}.{self._inputPort}K'
-        with self.com_lock:
-            response = self._connection.query(command).split(sep=',')
-        if response[2] == MassFlowController.TYPE_RESPONSE:
-            return np.float16(response[5]), np.float32(response[4]), time.time()
+        if self.virtual:
+            print(command)
         else:
-            return None
+            with self.com_lock:
+                response = self._connection.query(command).split(sep=',')
+            if response[2] == MassFlowController.TYPE_RESPONSE:
+                return np.float16(response[5]), np.float32(response[4]), time.time()
+            else:
+                self.logger.warning('Request for measured values returned something unexpected')
+                return None
+
 
     def clear_accumulated_value(self):
         ''' From manual: "allows any one channel input port accumulated value to be
@@ -386,9 +429,12 @@ class MassFlowController:
          Response should be None
          '''
         command = f'AZ{self._address}.{self._inputPort}Z1'
-        with self.com_lock:
-            response = self._connection.query(command).split(sep=',')
-        return response
+        if self.virtual:
+            print(command)
+        else:
+            with self.com_lock:
+                response = self._connection.query(command).split(sep=',')
+            return response
 
     '''
     Below are functions that program output values. The command structure is as follows:
@@ -423,9 +469,12 @@ class MassFlowController:
         else:
             pcode = self.Output_Program_Values[param] # this is a string
             command = f'AZ{self._address}.{self._outputPort}P{pcode}={value}'
-            with self.com_lock:
-                response = self._connection.query(command).split(sep=',')
-            return response
+            if self.virtual:
+                print(command)
+            else:
+                with self.com_lock:
+                    response = self._connection.query(command).split(sep=',')
+                return response
 
     def program_input_value(self,param,value):
         '''
@@ -453,6 +502,11 @@ class MassFlowController:
             with self.com_lock:
                 response = self._connection.query(command).split(sep=',')
             return response
+
+    def set_sccm(self,rate):
+        self.program_input_value('SP_Function','1')
+        self.program_input_value('SP_Rate',rate)
+
         
     def start_batch(self,batch_volume,batch_rate):
         ### should com_lock wrap around all three program requests?
@@ -464,42 +518,6 @@ class MassFlowController:
         command = f'AZ{self._address}.{self._outputPort}F*' # start channel batch
         with self.com_lock:
             response = self._connection.query(command).split(sep=",")
-        return response
-    
-    def run_batch(self,batch_volume,batch_rate):
-        ### differs from start batch in that this function waits for "DONE" signal
-        ### competing thread would just ask for a measurement, so it would be fine to interleave
-        ## program SP function to batch, SP Rate to desired rate, SP Batch to desired quantity, then start batch
-        self.program_output_value('SP_Function','2')
-        self.program_output_value('SP_Batch',batch_volume)
-        self.program_output_value('SP_Rate',batch_rate)
-        command = f'AZ{self._address}.{self._outputPort}F*' # start channel batch
-        with self.com_lock:
-            self._connection.write(command)
-            response = self._connection.readline()
-            while 'OK' in response:
-                time.wait(1)
-                response = self.connection.readline()
-                
-        return response
-    
-    def practice_batch(self,batch_volume,batch_rate):
-        ## want to test code
-        ### differs from start batch in that this function waits for "DONE" signal
-        ### competing thread would just ask for a measurement, so it would be fine to interleave
-        ## program SP function to batch, SP Rate to desired rate, SP Batch to desired quantity, then start batch
-        # self.program_output_value('SP_Function','2')
-        # self.program_output_value('SP_Batch',batch_volume)
-        # self.program_output_value('SP_Rate',batch_rate)
-        command = f'AZ{self._address}I' # start channel batch
-        with self.com_lock:
-            self._connection.write(command)
-            response = self._connection.readline()
-            while 'BROOKS' in response:
-                time.wait(10)
-                response = self.connection.readline()
-                print(response)
-                
         return response
     
     def valve_override(self,value):

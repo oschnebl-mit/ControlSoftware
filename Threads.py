@@ -130,11 +130,12 @@ class PurgeThread(QtCore.QThread):
         self.running = False
 
     
-    def setup(self,init_volume, init_rate, low_pressure, high_pressure, timeout = None, cycles = 3):
+    def setup(self,init_volume, init_rate, low_pressure, high_pressure, alarm_pressure, timeout = None, cycles = 3):
         self.volume = init_volume
         self.rate = init_rate
         self.low_pressure = low_pressure
         self.high_pressure = high_pressure
+        self.alarm_pressure = alarm_pressure
         self.timeout = timeout
         self.cycles = cycles
 
@@ -146,10 +147,10 @@ class PurgeThread(QtCore.QThread):
             self.timeout = self.volume/self.rate 
 
         if self.testing:
-            testing_message = f'Would run pump purge for {self.cycles} cycles with timeout of {self.timeout}'
+            testing_message = f'Would run pump/purge for {self.cycles} cycles with timeout of {self.timeout}'
             self.message.emit(testing_message)
             self.logger.info(testing_message)
-            print(testing_message)
+            # print(testing_message)
             for c in range(self.cycles):
                 if not self.running:  
                     break  
@@ -162,6 +163,7 @@ class PurgeThread(QtCore.QThread):
                 if not self.running:
                     break
                 ## pump first (assuming we start full of air)
+                self.DAQ.open_relay1()
                 self.DAQ.open_relay2()
                 message = f'On cycle {c+1}. Starting open to pump, waiting for {self.low_pressure} Torr'
                 self.logger.info(message)
@@ -169,15 +171,18 @@ class PurgeThread(QtCore.QThread):
                 self.wait_for_pressure(self.low_pressure,self.timeout)
                 self.DAQ.close_relay2()
                 ## purge with Ar second
-                self.DAQ.open_relay1()
-                self.MFC.MFC1.start_batch(self.volume, self.rate)
+                self.DAQ.open_relay0()
+                # self.MFC.MFC1.start_batch(self.volume, self.rate)
+                ## simple control means high pressure should be close but not too close to actual desired high
+                self.MFC.MFC2.set_sccm(self.rate)
                 message = f'On cycle {c+1}. Starting Ar purge at {self.rate}sccm for {self.volume}scc, waiting for {self.high_pressure} Torr'
                 self.logger.info(message)
                 self.message.emit(message)
-                self.wait_for_pressure(self.high_pressure, self.timeout)
-                self.DAQ.close_relay1()
+                self.wait_for_pressure(self.high_pressure,self.alarm_pressure, self.timeout)
+                self.MFC.MFC2.set_sccm(0)
+                self.DAQ.close_relay0()
 
-    def wait_for_pressure(self,pressure,timeout = None, delay = 10, tolerance = 5):
+    def wait_for_pressure(self,pressure,alarm_pressure=None,timeout = None, delay = 10, tolerance = 5):
         ''' wait until pressure within 5% of given pressure, checking at intervals of delay (s) '''
         self.waiting = True
         time = 0
@@ -186,15 +191,21 @@ class PurgeThread(QtCore.QThread):
                 break
             measured_pressure = self.PGauge.getPressure()
             self.new_pressure.emit(measured_pressure)
-            if timeout != None and timeout < time:
+            if measured_pressure >= alarm_pressure:
+                self.DAQ.close_relay0()
+                self.MFC.close_all()
+                self.running=False ## stop thread because something went wrong
+                break
+            elif timeout != None and timeout < time:
                 self.logger.error(f'Reached timeout waiting for pressure {pressure}')
+                # self.running=False
                 break ## this will allow the function to continue, which is good if it got close, bad if pressure gets too high
             elif 100*abs(measured_pressure - pressure)/pressure <= tolerance:
                 self.waiting = False
                 break
             else:
                 sleep(delay)
-                time += delay/60 # time in minutes, sleep in seconds
+                time += delay/60 # total time in min, delay is in seconds 
                 # QtCore.QThread.msleep(self.delay*1000)
 
 class DoseThread(QtCore.QThread):
@@ -214,10 +225,11 @@ class DoseThread(QtCore.QThread):
         self.DAQ = DAQ
         self.running = False
     
-    def setup(self,gas_name,init_volume, init_rate, target_pressure, timeout = None):
+    def setup(self,gas_name,init_volume, init_rate, target_pressure, alarm_pressure, timeout = None):
         self.volume = init_volume
         self.rate = init_rate
         self.pressure = target_pressure
+        self.alarm_pressure = alarm_pressure
         self.timeout = timeout
         self.gas_name = gas_name
         if not self.testing:
@@ -249,11 +261,11 @@ class DoseThread(QtCore.QThread):
             message = f'Beginning {self.gas_name} dose of {self.volume} scc at {self.rate} sccm'
             self.DAQ.open_relay0()
             self.DAQ.open_relay1()
-            self.active_MFC.start_batch(self.volume,self.rate)
+            self.active_MFC.set_sccm(self.rate)
             self.logger.info(message)
             self.message.emit(message)
             self.wait_for_pressure(self.pressure)
-            
+            self.active_MFC.set_sccm(0.0)
             self.DAQ.close_relay0()
             self.DAQ.close_relay1()
     
@@ -266,8 +278,12 @@ class DoseThread(QtCore.QThread):
             if not self.running:
                 break
             measured_pressure = self.PGauge.get_pressure()
-            measured_temperature = self.cryo.get_all_kelvin_reading()[1]
-            self.new_data.emit((measured_temperature,measured_pressure))
+            self.new_data.emit(measured_pressure)
+            if measured_pressure >= self.alarm_pressure:
+                self.DAQ.close_relay1()
+                self.active_MFC.set_sccm(0)
+                self.running=False
+                break
             if timeout != None and timeout < time:
                 self.logger.error(f'Reached timeout waiting for pressure {pressure}')
                 break ## this will allow the function to continue, which is good if it got close, bad if pressure gets too high

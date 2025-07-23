@@ -76,31 +76,31 @@ class MainControlWindow(qw.QMainWindow):
             self.logging_thread.start()
 
     def toggle_relay0(self):
-        if self.daq.relay0.isopen:
-            print('relay0 is open, closing relay')
+        if self.daq.relay0.read():
+            self.logger.info('relay0 is open, closing relay')
             self.daq.close_relay0()
-            self.testDAQ0Button.setChecked(False)
+            # self.testDAQ0Button.setChecked(False)
         else:
-            print('relay0 is closed, opening relay')
+            self.logger.info('relay0 is closed, opening relay')
             self.daq.open_relay0()
-            self.testDAQ0Button.setChecked(True)
+            # self.testDAQ0Button.setChecked(True)
 
     def toggle_relay1(self):
-        if self.daq.relay1open:
-            print('relay1 is open, closing relay')
+        if self.daq.relay1.read():
+            self.logger.info('relay1 is open, closing relay')
             self.daq.close_relay1()
             # self.testDAQ1Button.setChecked(False)
         else:
-            print('relay1 is closed, opening relay')
+            self.logger.info('relay1 is closed, opening relay')
             self.daq.open_relay1()
             # self.testDAQ1Button.setChecked(True)
 
     def toggle_relay2(self):
-        if self.daq.relay2.isopen:
-            print('relay2 is open, closing relay')
+        if self.daq.relay2.read():
+            self.logger.info('relay2 is open, closing relay')
             self.daq.close_relay2()
         else:
-            print('relay2 is closed, opening relay')
+            self.logger.info('relay2 is closed, opening relay')
             self.daq.open_relay2()
 
 
@@ -116,6 +116,7 @@ class MainControlWindow(qw.QMainWindow):
         self.dose_thread.running = False
         self.currentProcessPlot_grp.group.setTitle("Process aborted")
         #self.process_thread.running=False
+        self.daq.close_connections()
         if not self.testing:
             self.b0254.closeAll()
             self.daq.close_relay1()
@@ -126,12 +127,12 @@ class MainControlWindow(qw.QMainWindow):
        ## If testing, don't error out if failed to make connections
         if self.testing:
             try:
-                self.mks902 = PressureGauge(self.logger,'COM3') ##
+                self.mks902 = PressureGauge(self.testing,self.logger,'COM3') ##
             except:
                 self.mks902 = 'MKS902'
                 print("Failed to connect to MKS902 gauge.")
             try:
-                self.b0254 = Brooks0254(self.logger,    'ASRL8::INSTR') ## 
+                self.b0254 = Brooks0254(self.testing,self.logger,    'ASRL8::INSTR') ## 
                 self.mfcButton.clicked.connect(self.setupMFCs)
             except:
                 self.b0254 = 'Brooks0254'
@@ -143,13 +144,13 @@ class MainControlWindow(qw.QMainWindow):
                 self.ls335 = 'Model335'
                 print("Failed to connect to Lakeshore cryo controller.")
             try:
+                self.daq = DAQ(self.testing,self.logger,self.testing)
                 self.testDAQ1Button.clicked.connect(self.toggle_relay1)
-                self.daq = DAQ(self.logger,self.testing)
             except:
                 self.daq = 'DAQ'
                 print("Failed to connect to DAQ")
             try:
-                self.mks925 = PressureGauge(self.logger, 'COM5') ## not set yet
+                self.mks925 = PressureGauge(self.testing,self.logger, 'COM5') ## not set yet
             except:
                 self.mks925 = 'MKS925'
                 print("Failed to connect to MKS925.")
@@ -337,8 +338,6 @@ class MainControlWindow(qw.QMainWindow):
         self.currentProcessPlot = self.currentProcessPlot_grp.plot
         self.cp2 = None
 
-
-       
         self.logInput = qw.QLineEdit('30')
         self.logInput.setValidator(QtGui.QIntValidator())
         ## TODO: write function to update interval when this value changes
