@@ -221,7 +221,7 @@ class DoseThread(QtCore.QThread):
         self.timeout = timeout
         self.gas_name = gas_name
         if not self.testing:
-            if self.gas_name == 'H2S':
+            if self.gas_name == 'Ar':
                 self.active_MFC = self.MFC.MFC2
             elif self.gas_name == 'H2':
                 self.active_MFC = self.MFC.MFC3
@@ -247,12 +247,14 @@ class DoseThread(QtCore.QThread):
                 sleep(2)
         else:
             message = f'Beginning {self.gas_name} dose of {self.volume} scc at {self.rate} sccm'
+            self.DAQ.open_relay0()
             self.DAQ.open_relay1()
             self.active_MFC.start_batch(self.volume,self.rate)
             self.logger.info(message)
             self.message.emit(message)
             self.wait_for_pressure(self.pressure)
             
+            self.DAQ.close_relay0()
             self.DAQ.close_relay1()
     
 
@@ -263,7 +265,7 @@ class DoseThread(QtCore.QThread):
         while self.waiting:
             if not self.running:
                 break
-            measured_pressure = self.PGauge.getPressure()
+            measured_pressure = self.PGauge.get_pressure()
             measured_temperature = self.cryo.get_all_kelvin_reading()[1]
             self.new_data.emit((measured_temperature,measured_pressure))
             if timeout != None and timeout < time:

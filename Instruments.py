@@ -466,6 +466,42 @@ class MassFlowController:
             response = self._connection.query(command).split(sep=",")
         return response
     
+    def run_batch(self,batch_volume,batch_rate):
+        ### differs from start batch in that this function waits for "DONE" signal
+        ### competing thread would just ask for a measurement, so it would be fine to interleave
+        ## program SP function to batch, SP Rate to desired rate, SP Batch to desired quantity, then start batch
+        self.program_output_value('SP_Function','2')
+        self.program_output_value('SP_Batch',batch_volume)
+        self.program_output_value('SP_Rate',batch_rate)
+        command = f'AZ{self._address}.{self._outputPort}F*' # start channel batch
+        with self.com_lock:
+            self._connection.write(command)
+            response = self._connection.readline()
+            while 'OK' in response:
+                time.wait(1)
+                response = self.connection.readline()
+                
+        return response
+    
+    def practice_batch(self,batch_volume,batch_rate):
+        ## want to test code
+        ### differs from start batch in that this function waits for "DONE" signal
+        ### competing thread would just ask for a measurement, so it would be fine to interleave
+        ## program SP function to batch, SP Rate to desired rate, SP Batch to desired quantity, then start batch
+        # self.program_output_value('SP_Function','2')
+        # self.program_output_value('SP_Batch',batch_volume)
+        # self.program_output_value('SP_Rate',batch_rate)
+        command = f'AZ{self._address}I' # start channel batch
+        with self.com_lock:
+            self._connection.write(command)
+            response = self._connection.readline()
+            while 'BROOKS' in response:
+                time.wait(10)
+                response = self.connection.readline()
+                print(response)
+                
+        return response
+    
     def valve_override(self,value):
         # 0 = Normal, 1 = Closed, 2 = Open
         response = self.program_output_value('SP_VOR',value)

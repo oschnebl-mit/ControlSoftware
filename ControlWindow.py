@@ -60,7 +60,8 @@ class MainControlWindow(qw.QMainWindow):
         # self.stop_log_button.clicked.connect(self.stop_logging)
         self.purgeButton.clicked.connect(self.runPurge)
         self.abortButton.clicked.connect(self.abortAll)
-        self.doseH2SButton.clicked.connect(self.runH2SDose)
+        # self.doseH2SButton.clicked.connect(self.runH2SDose)
+        self.doseArButton.clicked.connect(self.runArDose)
         
         self.show()
     # def stop_logging(self):
@@ -74,6 +75,16 @@ class MainControlWindow(qw.QMainWindow):
             print('start logging')
             self.logging_thread.start()
 
+    def toggle_relay0(self):
+        if self.daq.relay0.isopen:
+            print('relay0 is open, closing relay')
+            self.daq.close_relay0()
+            self.testDAQ0Button.setChecked(False)
+        else:
+            print('relay0 is closed, opening relay')
+            self.daq.open_relay0()
+            self.testDAQ0Button.setChecked(True)
+
     def toggle_relay1(self):
         if self.daq.relay1open:
             print('relay1 is open, closing relay')
@@ -85,7 +96,7 @@ class MainControlWindow(qw.QMainWindow):
             # self.testDAQ1Button.setChecked(True)
 
     def toggle_relay2(self):
-        if self.testDAQ2Button.isChecked:
+        if self.daq.relay2.isopen:
             print('relay2 is open, closing relay')
             self.daq.close_relay2()
         else:
@@ -152,6 +163,7 @@ class MainControlWindow(qw.QMainWindow):
                 self.mks925 = PressureGauge(self.logger,'COM5')
 
                 self.daq = DAQ(self.logger,self.testing)
+                self.testDAQ0Button.clicked.connect(self.toggle_relay0)
                 self.testDAQ1Button.clicked.connect(self.toggle_relay1)
                 self.testDAQ2Button.clicked.connect(self.toggle_relay2)
     
@@ -218,6 +230,27 @@ class MainControlWindow(qw.QMainWindow):
         rate = self.processTree.getH2SDoseValue('Batch Rate')
         pressure = self.processTree.getH2SDoseValue('Cut-off Pressure')
         self.dose_thread.setup('H2S',volume,rate,pressure)
+        self.dose_thread.start()
+        
+
+    def runArDose(self):
+        # get plot ready
+        self.currentProcessPlot.clear()
+        self.currentProcessPlot_grp.group.setTitle("Dose Process")
+        self.currentProcessPlot.setLabel('left',"Pressure", units='Torr')
+        self.currentProcessPlot.setLabel('bottom',"Temperature",units='K')
+        self.currentProcessPlot_grp.trace = pg.ScatterPlotItem(symbol='o',size=10,color='b')
+        self.currentProcessPlot_grp.last_point = pg.ScatterPlotItem(symbol='+',size=30,color='#08F7FE')
+        self.currentProcessPlot.addItem(self.currentProcessPlot_grp.trace)
+        self.currentProcessPlot.addItem(self.currentProcessPlot_grp.last_point)
+        self.dose_thread.new_data.connect(self.currentProcessPlot_grp.update_xy)
+        self.dose_thread.finished.connect(self.doseFinished)
+        # setup and run thread - 
+        volume = self.processTree.getArDoseValue('Batch Volume')
+        rate = self.processTree.getArDoseValue('Batch Rate')
+        pressure = self.processTree.getArDoseValue('Cut-off Pressure')
+        # dose thread should use Ar MFC
+        self.dose_thread.setup('Ar',volume,rate,pressure)
         self.dose_thread.start()
 
     def doseFinished(self):
@@ -317,7 +350,8 @@ class MainControlWindow(qw.QMainWindow):
         self.logButton.setCheckable(True)
         # self.logButton.setChecked(False)
 
-        self.doseH2SButton = qw.QPushButton("Dose with H2S")
+        # self.doseH2SButton = qw.QPushButton("Dose with H2S")
+        self.doseArButton = qw.QPushButton("Dose with Ar")
         self.doseH2Button = qw.QPushButton("Dose with H2")
         self.purgeButton = qw.QPushButton("Run purge") 
         self.abortButton = qw.QPushButton("Stop Process")
@@ -326,6 +360,9 @@ class MainControlWindow(qw.QMainWindow):
         self.mfcButton = qw.QPushButton("Re-initialize MFCs")
         self.mks925Button = qw.QPushButton("Re-initialize MKS925 (Pirani)")
         self.mks902Button = qw.QPushButton("Re-initialize MKS902B (Piezo)")
+        self.testDAQ0Button = qw.QPushButton("Toggle DAQ Relay 0")
+        self.testDAQ0Button.setCheckable(True)
+        self.testDAQ0Button.setChecked(False)
         self.testDAQ1Button = qw.QPushButton("Toggle DAQ Relay 1")
         self.testDAQ1Button.setCheckable(True)
         # self.testDAQ1Button.setChecked(False)
@@ -357,7 +394,8 @@ class MainControlWindow(qw.QMainWindow):
         ## Left Column:
         layout.addWidget(self.mfcButton,       0,0,1,1)
         layout.addWidget(self.mks925Button,    1,0,1,1)
-        layout.addWidget(self.mks902Button,    2,0,1,1)
+        # layout.addWidget(self.mks902Button,    2,0,1,1)
+        layout.addWidget(self.testDAQ0Button,  2,0,1,1)
         layout.addWidget(self.testDAQ1Button,  3,0,1,1)
         layout.addWidget(self.testDAQ2Button,  4,0,1,1)
         layout.addWidget(self.ctrlTree,        5,0,12,1)
@@ -372,7 +410,8 @@ class MainControlWindow(qw.QMainWindow):
         # layout.addWidget(self.stop_log_button, 3,2,1,1)
         layout.addWidget(self.abortButton,     3,2,1,1)
         layout.addWidget(self.purgeButton,     4,2,1,1)
-        layout.addWidget(self.doseH2SButton,   5,2,1,1)
+        layout.addWidget(self.doseArButton,    5,2,1,1)
+        # layout.addWidget(self.doseH2SButton,   5,2,1,1)
         layout.addWidget(self.doseH2Button,    6,2,1,1)
         # layout.addWidget(self.abortButton,     7,2,1,1)
         layout.addWidget(self.setCryoButton,   7,2,1,1)
