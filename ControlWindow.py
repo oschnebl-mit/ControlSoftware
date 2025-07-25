@@ -431,7 +431,7 @@ class MainControlWindow(qw.QMainWindow):
         self.logger.info(f'Closing serial connections and GUI window.')
         self.mks902._connection.close()
         self.mks925._connection.close()
-        # self.b0254.connection.close_connection()
+        self.b0254._connection.close()
         self.ls335.disconnect_usb()
         self.daq.close_connections()
         event.accept()

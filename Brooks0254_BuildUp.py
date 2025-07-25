@@ -1,6 +1,7 @@
 import pyvisa
 import numpy as np
 import time
+from datetime import datetime
 from threading import Lock
 ''' Defining Global Dictionary out here:'''
 Output_Program_Values = {
@@ -40,9 +41,9 @@ class Brooks0254:
         self.__address = deviceAddress
         
 
-        self.MFC1 = None
-        self.MFC2 = None
-        self.MFC3 = None
+        self.MFC1 = MassFlowController(testing=self.testing,channel=1,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
+        self.MFC2 = MassFlowController(testing=self.testing,channel=2,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
+        self.MFC3 = MassFlowController(testing=self.testing,channel=3,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
 
         self.MFC_list = []
 
@@ -197,22 +198,20 @@ class MassFlowController:
         self.com_lock = Lock()
 
 
-    def setup_MFC(self,gas_factor='1.000',rate_units=18,time_base=2,decimal_point=1, SP_func = 1):
+    def setup_MFC(self,gas_factor=1,rate_units=18,time_base=2,decimal_point=1, SP_func = 1):
         ''' 
-        GAS_FACTOR:
+        GAS_FACTOR TODO
         rate_units: scc = 18, cm^3 = 6, cm^3s = 7, cm^3n = 8, sl = 19, ml = 0 (plus others)
         time_base: sec = 1, min = 2, hrs = 3, day = 4 
         decimal point: 0 = xxx. , 1 = xx.x , 2 = x.xx , 3 = .xxx 
         SP Func: rate = 1, batch = 2, blend = 3
         '''
-        
-
-        self.program_input_value('Measure_Units',rate_units)
+        response = self.program_input_value('Measure_Units',rate_units)
         self.program_input_value('Time_Base',time_base)
         self.program_input_value('Decimal_Point',decimal_point)
-        response = self.program_input_value('Gas_Factor',gas_factor)
+        self.program_input_value('Gas_Factor',f'{gas_factor:0<5}') ## format gas factor so it always has 4 sig figs
 
-        # print(response)
+        self.logger.info('Successfully programmed MFC input values, received following response', response)
 
 
     def get_measured_values(self):
@@ -366,9 +365,18 @@ class MassFlowController:
 if __name__ == "__main__":
     rm = pyvisa.ResourceManager()
     brooks = rm.open_resource('ASRL8::INSTR',read_termination='\r',write_termination='\r')
-    brooks4channel = Brooks0254(brooks, deviceAddress='29751')
+    brooks4channel = Brooks0254(False, brooks, deviceAddress='29751')
 
-    brooks4channel.MFC_list[1].practice_batch(1.0,0.1)
-    # response = brooks4channel.MFC_list[1].read_port_values(input = False)
-    # print(response)
-    # brooks4channel.MFC_list[1].program_output_value('SP_Rate',0.0)
+    # brooks4channel.MFC_list[1].practice_batch(1.0,0.1)
+    print(brooks4channel.MFC2.program_output_value('SP_Rate',4.0))
+    print(brooks4channel.MFC2.read_programmed_value('SP_Rate'))
+    time.sleep(10)
+    response = brooks4channel.MFC2.get_measured_values()
+    print(response)
+    time.sleep(10)
+    print(brooks4channel.MFC2.program_output_value('SP_Rate',0.0))
+    print(brooks4channel.MFC2.read_programmed_value('SP_Rate'))
+    time.sleep(10)
+    response = brooks4channel.MFC2.get_measured_values()
+    print(response)
+    

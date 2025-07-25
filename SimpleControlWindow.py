@@ -11,20 +11,25 @@ from Instruments import PressureGauge, DAQ, Brooks0254
 class PressureLoggingThread(QtCore.QThread):
     new_rxn_pressure_data = QtCore.pyqtSignal(float)
     new_cryo_pressure_data = QtCore.pyqtSignal(float)
+    new_flow_data = QtCore.pyqtSignal(float)
 
-    def __init__(self,logger, rxnGauge, cryoGauge,delay=30):
+    def __init__(self,logger, rxnGauge, cryoGauge,b0254,delay=30):
         super().__init__()
         self.logger = logger
         self.delay=delay
 
         self.rxnPressure = rxnGauge
         self.cryoPressure = cryoGauge
+        self.b0254 = b0254
 
     def run(self):
         self.running = True
         while self.running:
             self.new_rxn_pressure_data.emit(self.rxnPressure.get_pressure())
             self.new_cryo_pressure_data.emit(self.cryoPressure.get_pressure())
+            if self.b0254 != 'Brooks0254':
+                meas = self.b0254.MFC2.get_measured_values()
+                self.new_flow_data.emit(meas[0])
         QtCore.QThread.msleep(self.delay*1000)
 
 class DoseThread(QtCore.QThread):
@@ -46,7 +51,7 @@ class DoseThread(QtCore.QThread):
         self.logger.info(f'Setting Ar to {self.rate} sccm and waiting for {self.timeout} min')
         for n in self.timeout*60/10:
             pv,tot,time = self.MFC.get_measured_values()
-            new_flow_data.emit(pv)
+            self.new_flow_data.emit(pv)
             QtCore.QThread.msleep(10*1000)
         self.MFC.set_sccm(0.0)
         self.logger.info(f'Setting Ar to 0 sccm')
@@ -63,23 +68,28 @@ class SimpleControlWindow(qw.QMainWindow):
 
         self.initUI()
         self.initInstruments()
-
+        if self.mks902 != 'MKS902':
+            self.start_logging() ## if both gauges connect, start logging pressure and displaying it
         self.show()
 
     def start_logging(self):
-        self.logging_thread = PressureLoggingThread(self.logger,self.mks925,self.mks902)
+        self.logging_thread = PressureLoggingThread(self.logger,self.mks902,self.mks925,self.b0254)
         self.logging_thread.new_cryo_pressure_data.connect(self.updateCryoPressure)
         self.logging_thread.new_rxn_pressure_data.connect(self.updateRxnPressure)
+        if self.b0254 != 'Brooks0254':
+            self.logging_thread.new_flow_data.connect(self.updateFlow)
+        else:
+            print('Only updating pressure, not flow')
         self.logging_thread.start()
 
     def updateCryoPressure(self,new_data):
-        self.cryoPressure.setText(new_data)
+        self.cryoPressure.setText(str(new_data))
 
     def updateRxnPressure(self,new_data):
-        self.rxnPressure.setText(new_data)
+        self.rxnPressure.setText(str(new_data))
 
     def updateFlow(self,new_data):
-        self.flow.setText(new_data)
+        self.flow.setText(str(new_data))
 
     def abort(self):
         self.daq.close_relay0()
@@ -99,15 +109,17 @@ class SimpleControlWindow(qw.QMainWindow):
         self.alarm_pressure = float(self.dalarmInput.text())
 
         self.dose_thread = DoseThread(self.logger,self.b0254.MFC2, self.rate,self.vol,self.target_pressure,self.alarm_pressure)
-        self.DoseThread.new_flow_data.connet(self.updateFlow)
+        self.logging_thread.new_flow_data.disconnect(self.updateFlow)
+        self.dose_thread.new_flow_data.connect(self.updateFlow)
         self.dose_thread.start()
 
 
     def closeEvent(self,event):
        ## doesn't account for only some instruments being on 
+        self.logging_thread.running = False
         self.logger.info(f'Closing serial connections and GUI window.')
         self.daq.close_connections()
-        self.b0254.connection.close_connection()
+        self.b0254._connection.close()
         self.mks902._connection.close()
         self.mks925._connection.close()
         event.accept()
@@ -136,7 +148,6 @@ class SimpleControlWindow(qw.QMainWindow):
             print("Failed to connect to MKS925.")
         try:
             self.mks902 = PressureGauge(False,self.logger,'COM3') ##
-            self.start_logging() ## if both gauges connect, start logging pressure and displaying it
         except:
             self.mks902 = 'MKS902'
             print("Failed to connect to MKS902 gauge.")
@@ -292,9 +303,7 @@ if __name__ == "__main__":
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
 
-    # window = SimpleControlWindow(logger = logger)
+    window = SimpleControlWindow(logger = logger)
     
-    # sys.exit(app.exec())
+    sys.exit(app.exec())
 
-    gas_factor = 1.0
-    print(f'{gas_factor:0<5}')

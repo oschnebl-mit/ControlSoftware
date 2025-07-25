@@ -303,13 +303,7 @@ class Brooks0254:
 
         self.MFC_list = [self.MFC1,self.MFC2, self.MFC3]
 
-        # for n, MFC in enumerate(self.MFC_list,start=1):
-        #     MFC.setup_MFC()
-    
-    def setupMFCs(self,gf):
-        '''Currently just sets the gas factor to a value from the parameter tree'''
-        for n, MFC in enumerate(self.MFC_list,start=1):
-            MFC.setup_MFC(gas_factor=gf[n-1],rate_units=18,time_base=2,decimal_point=1, SP_func = 1)
+
 
     def readValue(self):
         return 0
@@ -465,7 +459,7 @@ class MassFlowController:
          Sends a program command to change the param (a str) to value (a float)
         '''
         if param not in self.Output_Program_Values:
-            return 'Error: not an output parameter'
+            self.logger.info('Error: not an output parameter')
         else:
             pcode = self.Output_Program_Values[param] # this is a string
             command = f'AZ{self._address}.{self._outputPort}P{pcode}={value}'
@@ -474,6 +468,7 @@ class MassFlowController:
             else:
                 with self.com_lock:
                     response = self._connection.query(command).split(sep=',')
+                self.logger.info(f'Received response {response}')
                 return response
 
     def program_input_value(self,param,value):
@@ -481,12 +476,15 @@ class MassFlowController:
          Sends a program command to change the param (a str) to value (a float)
         '''
         if param not in self.Input_Program_Values:
-            return 'Error: not an output parameter'
+            self.logger.info('Error: not an input parameter')
+            return None
         else:
             pcode = self.Input_Program_Values[param] # this is a 2 chr string
             command = f'AZ{self._address}.{self._inputPort}P{pcode}={value}'
+            self.logger.info(f'Sending command {command} to controller.')
             with self.com_lock:
                 response = self._connection.query(command).split(sep=',')
+            self.logger.info(f'Received response {response}')
             return response
 
     def read_programmed_value(self,param,value):
@@ -504,8 +502,9 @@ class MassFlowController:
             return response
 
     def set_sccm(self,rate):
-        self.program_input_value('SP_Function','1')
-        self.program_input_value('SP_Rate',rate)
+        self.logger.info(f'Setting MFC to {rate}')
+        self.program_output_value('SP_Function','1')
+        self.program_output_value('SP_Rate',rate)
 
         
     def start_batch(self,batch_volume,batch_rate):
