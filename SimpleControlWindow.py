@@ -4,8 +4,7 @@ from PyQt5 import QtGui,QtCore
 import PyQt5.QtWidgets as qw 
 import pyqtgraph as pg
 import numpy as np
-import logging
-
+import logging,csv
 from Instruments import PressureGauge, DAQ, Brooks0254
 
 class PressureLoggingThread(QtCore.QThread):
@@ -13,23 +12,42 @@ class PressureLoggingThread(QtCore.QThread):
     new_cryo_pressure_data = QtCore.pyqtSignal(float)
     new_flow_data = QtCore.pyqtSignal(float)
 
-    def __init__(self,logger, rxnGauge, cryoGauge,b0254,delay=30):
+    def __init__(self,logger, rxnGauge, cryoGauge,b0254,delay=30,save_csv=False):
         super().__init__()
         self.logger = logger
         self.delay=delay
-
+        self.save_csv = save_csv
         self.rxnPressure = rxnGauge
         self.cryoPressure = cryoGauge
         self.b0254 = b0254
 
     def run(self):
         self.running = True
+        row = 0
+        if self.save_csv:
+            timestr = t.strftime('%Y%m%d-%H%M%S')
+            self.log_path = f'logs/CryoTest_{timestr}.csv'
         while self.running:
             self.new_rxn_pressure_data.emit(self.rxnPressure.get_pressure())
             self.new_cryo_pressure_data.emit(self.cryoPressure.get_pressure())
             if self.b0254 != 'Brooks0254':
                 meas = self.b0254.MFC2.get_measured_values()
                 self.new_flow_data.emit(meas[0])
+            if self.save_csv:
+                log_dict = {
+                    'Time':t.strftime('%H:%M:%S'),
+                    'Reaction Pressure':self.rxnPressure.get_pressure(),
+                    'Cryo Pressure':self.cryoPressure.get_pressure()
+                        }
+                if self.b0254 != 'Brooks0254':
+                    log_dict['MFC values'] = self.b0254.MFC2.get_measured_values()
+                with open(self.log_path,'a',newline='') as csvfile:
+                    w = csv.DictWriter(csvfile, log_dict.keys())
+                    if row == 0:
+                        w.writeheader()
+                    w.writerow(log_dict)
+                    row +=1 
+
         QtCore.QThread.msleep(self.delay*1000)
 
 class DoseThread(QtCore.QThread):
@@ -59,11 +77,12 @@ class DoseThread(QtCore.QThread):
 
 
 class SimpleControlWindow(qw.QMainWindow):
-    def __init__(self,logger):
+    def __init__(self,logger,save_csv=False):
         ''' For simple testing of MFCs and DAQ'''
 
         super().__init__()
         self.logger = logger
+        self.save_csv = save_csv
         self.resize(1280,720) # non-maximized state
 
         self.initUI()
@@ -73,7 +92,7 @@ class SimpleControlWindow(qw.QMainWindow):
         self.show()
 
     def start_logging(self):
-        self.logging_thread = PressureLoggingThread(self.logger,self.mks902,self.mks925,self.b0254)
+        self.logging_thread = PressureLoggingThread(self.logger,self.mks902,self.mks925,self.b0254,delay=20,save_csv=self.save_csv)
         self.logging_thread.new_cryo_pressure_data.connect(self.updateCryoPressure)
         self.logging_thread.new_rxn_pressure_data.connect(self.updateRxnPressure)
         if self.b0254 != 'Brooks0254':
@@ -303,7 +322,7 @@ if __name__ == "__main__":
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
 
-    window = SimpleControlWindow(logger = logger)
+    window = SimpleControlWindow(logger = logger,save_csv = True)
     
     sys.exit(app.exec())
 
