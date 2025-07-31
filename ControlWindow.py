@@ -5,8 +5,8 @@ import PyQt5.QtWidgets as qw
 import pyqtgraph as pg
 import numpy as np
 import logging
-
-from Control_Parameters import CtrlParamTree, ProcessTree
+from Control_Parameters import CryoTree
+# from Control_Parameters import CtrlParamTree, ProcessTree
 # from Brooks0254_BuildUp import Brooks0254, MassFlowController
 # from PressureGauge_BuildUp import PressureGauge
 from DummyPressureThread import DummyThread, NotAsDumbThread
@@ -33,35 +33,19 @@ class MainControlWindow(qw.QMainWindow):
         self.logging_delay = int(self.logInput.text())
         self.logInput.returnPressed.connect(self.updateLogInterval)
 
-
-        if self.testing:
-
-
-            self.initThreads()
-
-            self.mfcButton.clicked.connect(self.setupMFCs)
-
-        else:
-            self.initThreads()
-
-           ## connect UI items to running functions
-            self.mfcButton.clicked.connect(self.setupMFCs)
-            self.mks925Button.clicked.connect(self.setupMKS925)
-            self.mks902Button.clicked.connect(self.setupMKS902)
-            # self.changeTempButton.clicked.connect(lambda: self.ls335.changeSetpoint(float(self.tempInput.text())))
+        self.initThreads()
 
         ## connect logging plots, if testing the logging thread will give dummy data
         self.logging_thread.new_cryo_pressure_data.connect(self.cryoVac_grp.update_plot)
         self.logging_thread.new_rxn_pressure_data.connect(self.rxnVac_grp.update_plot)
         self.logging_thread.new_cryo_temp_data.connect(self.cryoTemp_grp.update_plot)
         self.logging_thread.new_rxn_temp_data.connect(self.rxnTemp_grp.update_plot)
+        self.logging_thread.new_flow_data.connect(self.updateFlow)
 
         self.logButton.clicked.connect(self.toggle_logging)
-        # self.stop_log_button.clicked.connect(self.stop_logging)
-        self.purgeButton.clicked.connect(self.runPurge)
+        self.setCryoButton.clicked.connect(self.change_cryo)
         self.abortButton.clicked.connect(self.abortAll)
-        # self.doseH2SButton.clicked.connect(self.runH2SDose)
-        self.doseArButton.clicked.connect(self.runArDose)
+
         
         self.show()
     # def stop_logging(self):
@@ -103,6 +87,11 @@ class MainControlWindow(qw.QMainWindow):
             self.logger.info('relay2 is closed, opening relay')
             self.daq.open_relay2()
 
+    def updateFlow(self,new_data):
+        self.flow.setText(str(new_data))
+        old_total = float(self.vol.text())
+        new_total = old_total + self.logging_delay/60*new_data
+        self.vol.setText(str(new_total))
 
     def updateLogInterval(self):
         self.logging_delay = int(self.logInput.text())
@@ -176,10 +165,14 @@ class MainControlWindow(qw.QMainWindow):
                 self.logger.exception(e)
 
         
-        self.logging_thread = LoggingThread(self.logger,self.ls335,self.b0254,self.mks902,self.mks925,self.logging_delay,self.testing) 
+        self.logging_thread = LoggingThread(self.logger,self.ls335,self.b0254,self.mks902,self.mks925,self.save_csv.isChecked(),self.logging_delay,self.testing) 
         self.purge_thread = PurgeThread(self.testing, self.logger, self.b0254,self.mks925,self.daq)
         self.dose_thread = DoseThread(self.testing, self.logger, self.b0254,self.mks925,self.daq, self.ls335)
 
+    def setAr(self):
+        self.rate = float(self.rateInput.text())
+        self.b0254.MFC2.set_sccm(self.rate)
+        self.logger.info(f'Setting Ar to {self.rate} sccm')
        
     
     def runPurge(self):
@@ -269,42 +262,6 @@ class MainControlWindow(qw.QMainWindow):
 
 
 
-    def setupMKS925(self):
-        ## function intended to troubleshoot connection to pressure gauge from within gui
-        unit = self.ctrlTree.getPressureParamValue('MKS 925 Setup Parameters','Pressure unit')
-        addr = self.ctrlTree.getPressureParamValue('MKS 925 Setup Parameters','Address')
-        baud = self.ctrlTree.getPressureParamValue('MKS 925 Setup Parameters','Baud Rate')
-        self.logger.debug(f'Setting MKS925 gauge to new parameters: {unit},{addr},{baud}')
-        self.mks925.set_gauge_params(unit,addr,baud)
-
-    def setupMKS902(self):
-        ## function intended to troubleshoot connection to pressure gauge from within gui
-        unit = self.ctrlTree.getPressureParamValue('MKS 902B Setup Parameters','Pressure unit')
-        addr = self.ctrlTree.getPressureParamValue('MKS 902B Setup Parameters','Address')
-        baud = self.ctrlTree.getPressureParamValue('MKS 902B Setup Parameters','Baud Rate')
-        self.logger.debug(f'Setting MKS902B gauge to new parameters: {unit},{addr},{baud}')
-        self.mks902.set_gauge_params(unit,addr,baud)
-
-    def setupMFCs(self):
-        for i in range(3):
-            gas_factor = self.ctrlTree.getMFCParamValue(i+1,'Gas Factor')
-            rate_units_str = self.ctrlTree.getMFCParamValue(i+1,'Rate Units')
-            time_base_str = self.ctrlTree.getMFCParamValue(i+1,'Time Base')
-            decimal_point = self.ctrlTree.getMFCParamValue(i+1,'Decimal Point')
-            func = self.ctrlTree.getMFCParamValue(i+1,'SP Function')
-            if self.testing:
-                print(f'Try to program MFC{i+1} with gas factor {gas_factor}, rate units {rate_units_str},time base {time_base_str}, decimal point {decimal_point}, and SP function {func}')
-                try:
-                    rate_units = self.b0254.MEASUREMENT_UNITS[rate_units_str]
-                    time_base = self.b0254.RATE_TIME_BASE[time_base_str]
-                    self.b0254.MFC_list[i].setup_MFC(gas_factor,rate_units,time_base,decimal_point,func)
-                except:
-                    print('Failed to program MFC')
-            else:
-                rate_units = self.b0254.MEASUREMENT_UNITS[rate_units_str]
-                time_base = self.b0254.RATE_TIME_BASE[time_base_str]
-                self.b0254.MFC_list[i].setup_MFC(gas_factor,rate_units,time_base,decimal_point,func)
-
     def initUI(self):
         ### # Dedicated colors which look "good"
         # colors = ['#08F7FE', '#FE53BB', '#F5D300', '#00ff41', '#FF0000', '#9467bd', ]
@@ -338,40 +295,46 @@ class MainControlWindow(qw.QMainWindow):
         self.currentProcessPlot = self.currentProcessPlot_grp.plot
         self.cp2 = None
 
+        self.save_csv = qw.QCheckBox('Save to csv')
         self.logInput = qw.QLineEdit('30')
         self.logInput.setValidator(QtGui.QIntValidator())
         ## TODO: write function to update interval when this value changes
-        self.logLabel = qw.QLabel('Logging Interval (s):')
+        self.logLabel = qw.QLabel('Logging Interval (sec):')
         self.logButton = qw.QPushButton("Start Logging")
-        # self.stop_log_button = qw.QPushButton("Stop Logging")
-        
-        # self.logButton.clicked.connect(self.handleLogging)
         self.logButton.setCheckable(True)
         # self.logButton.setChecked(False)
-
-        # self.doseH2SButton = qw.QPushButton("Dose with H2S")
-        self.doseArButton = qw.QPushButton("Dose with Ar")
-        self.doseH2Button = qw.QPushButton("Dose with H2")
-        self.purgeButton = qw.QPushButton("Run purge") 
         self.abortButton = qw.QPushButton("Stop Process")
 
-        self.ctrlTree = CtrlParamTree()
-        self.mfcButton = qw.QPushButton("Re-initialize MFCs")
-        self.mks925Button = qw.QPushButton("Re-initialize MKS925 (Pirani)")
-        self.mks902Button = qw.QPushButton("Re-initialize MKS902B (Piezo)")
+        self.setRateButton = qw.QPushButton("Set Ar sccm")
+        self.rateInput = qw.QLineEdit("1.0")
+        self.rateInput.setValidator(QtGui.QDoubleValidator())
+
+        self.flow = qw.QLabel('0.0')
+        self.flow_units = qw.QLabel('sccm')
+        self.vol = qw.QLabel('0.0')
+        self.vol_units = qw.QLabel('cm3')
+        self.flowBox = qw.QWidget()
+        masterLayoutflow = qw.QVBoxLayout()
+        flowLayout = qw.QGridLayout()
+        flowgroup = qw.QGroupBox('Measured Flow')
+        flowgroup.setLayout(flowLayout)
+        flowLayout.addWidget(self.flow,       0,0,1,1)
+        flowLayout.addWidget(self.vol,        1,0,1,1)
+        flowLayout.addWidget(self.flow_units, 0,1,1,1)
+        flowLayout.addWidget(self.vol_units,  1,1,1,1)
+        masterLayoutflow.addWidget(flowgroup)
+        self.flowBox.setLayout(masterLayoutflow)
+
+
         self.testDAQ0Button = qw.QPushButton("Toggle DAQ Relay 0")
         self.testDAQ0Button.setCheckable(True)
-        self.testDAQ0Button.setChecked(False)
         self.testDAQ1Button = qw.QPushButton("Toggle DAQ Relay 1")
         self.testDAQ1Button.setCheckable(True)
-        # self.testDAQ1Button.setChecked(False)
         self.testDAQ2Button = qw.QPushButton("Toggle DAQ Relay 2")
         self.testDAQ2Button.setCheckable(True)
-        # self.testDAQ2Button.setChecked(False)
-
-        self.processTree = ProcessTree()
 
         self.setCryoButton = qw.QPushButton("Change Cryo Setpoint")
+        self.cryoTree = CryoTree()
 
         '''
         Some notes on the grid layout: 
@@ -391,32 +354,24 @@ class MainControlWindow(qw.QMainWindow):
         layout.setContentsMargins(1,0,1,0)
         ## Add widgets to layout grid w/ row, col, rowspan, colspan
         ## Left Column:
-        layout.addWidget(self.mfcButton,       0,0,1,1)
-        layout.addWidget(self.mks925Button,    1,0,1,1)
-        # layout.addWidget(self.mks902Button,    2,0,1,1)
-        layout.addWidget(self.testDAQ0Button,  2,0,1,1)
-        layout.addWidget(self.testDAQ1Button,  3,0,1,1)
-        layout.addWidget(self.testDAQ2Button,  4,0,1,1)
-        layout.addWidget(self.ctrlTree,        5,0,12,1)
+        layout.addWidget(self.logLabel,        0,0,1,1)
+        layout.addWidget(self.logInput,        1,0,1,1)
+        layout.addWidget(self.logButton,       2,0,1,1)
+        layout.addWidget(self.save_csv,        3,0,1,1)
+        layout.addWidget(self.setCryoButton,   4,0,1,1)
+        layout.addWidget(self.cryoTree,        5,0,10,1)
 
-        ## Top middle buttons and inputs (start at col 1, row 0)
-        layout.addWidget(self.processTree,     0,1,10,1)
+        ### Middle Column
+        layout.addWidget(self.rateInput,       1,1,1,1)
+        layout.addWidget(self.setRateButton,   1,2,1,1)
+        layout.addWidget(self.flowBox,         2,1,2,2)
+        layout.addWidget(self.testDAQ0Button,  4,2,1,1)
+        layout.addWidget(self.testDAQ1Button,  5,2,1,1)
+        layout.addWidget(self.testDAQ2Button,  6,2,1,1)
 
-        layout.addWidget(self.logLabel,        0,2,1,1)
-        layout.addWidget(self.logInput,        1,2,1,1)
-
-        layout.addWidget(self.logButton,       2,2,1,1)
-        # layout.addWidget(self.stop_log_button, 3,2,1,1)
-        layout.addWidget(self.abortButton,     3,2,1,1)
-        layout.addWidget(self.purgeButton,     4,2,1,1)
-        layout.addWidget(self.doseArButton,    5,2,1,1)
-        # layout.addWidget(self.doseH2SButton,   5,2,1,1)
-        layout.addWidget(self.doseH2Button,    6,2,1,1)
-        # layout.addWidget(self.abortButton,     7,2,1,1)
-        layout.addWidget(self.setCryoButton,   7,2,1,1)
         
         ## current process plot middle bottom (start at row 8, col 1)
-        layout.addWidget(self.currentProcessPlot_grp,10,1,10,2)
+        layout.addWidget(self.currentProcessPlot_grp,8,1,10,2)
 
         ## Right Hand column of plots
         layout.addWidget(self.cryoTemp_grp,    0, 3,5,1)

@@ -8,16 +8,17 @@ class LoggingThread(QtCore.QThread):
     ''' Periodically asks for data from pressure gauge, furnace, and MFCS. Passes measured data and overpressure alarm to main window'''
     new_rxn_temp_data = QtCore.pyqtSignal(float)
     new_cryo_temp_data = QtCore.pyqtSignal(float)
-    # new_flow_data = QtCore.pyqtSignal(object) ## not sure how I'll handle gases yet
+    new_flow_data = QtCore.pyqtSignal(object) ## not sure how I'll handle gases yet
     new_rxn_pressure_data = QtCore.pyqtSignal(float)
     new_cryo_pressure_data = QtCore.pyqtSignal(float)
 
-    def __init__(self,logger,cryoControl, mfcControl, rxnGauge, cryoGauge,delay=30,testing = False):
+    def __init__(self,logger,cryoControl, mfcControl, rxnGauge, cryoGauge,save_csv,delay=30,testing = False):
         super().__init__()
         self.logger = logger
         # self.log_path = log_path
         self.testing = testing
         self.delay=delay
+        self.save_csv = save_csv
 
         if not self.testing:
             self.cryoControl = cryoControl
@@ -101,15 +102,23 @@ class LoggingThread(QtCore.QThread):
                     'Reaction Temperature':rxn_temp,
                     'Cryo Temperature':cryo_temp
                 }
+                if self.b0254 != 'Brooks0254':
+                    sccm, tot, time = self.b0254.MFC2.get_measured_values()
+                    log_dict['Ar sccm'] = sccm
+                    self.new_flow_data.emit(sccm)
                 self.new_rxn_pressure_data.emit(log_dict['Reaction Pressure'])
                 self.new_cryo_pressure_data.emit(log_dict['Cryo Pressure'])
                 self.new_cryo_temp_data.emit(cryo_temp)
                 self.new_rxn_temp_data.emit(rxn_temp)
-
-                ## adding code to save measured values to a csv as well
-                # df = pd.DataFrame([log_dict])
-                # df.to_csv(self.log_path,mode='a' if self.log_path.exists() else 'w',header=not self.log_path.exists(),index=False)
-                ###
+                if self.save_csv:
+                    with open(self.log_path,'a',newline='') as csvfile:
+                            w = csv.DictWriter(csvfile, log_dict.keys())
+                            if row == 0:
+                                w.writeheader()
+                            w.writerow(log_dict)
+                            # writer = csv.writer(csvfile, delimiter=' ',
+                                        # quotechar='|', quoting=csv.QUOTE_MINIMAL)
+                            row +=1 
             QtCore.QThread.msleep(self.delay*1000)
 
 

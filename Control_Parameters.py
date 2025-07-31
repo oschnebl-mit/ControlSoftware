@@ -91,13 +91,13 @@ class ProcessTree(ParameterTree):
                 {'name':'Batch Volume','type':'float','value':1},
                 {'name':'Batch Rate','type':'float','value':1},
                 {'name':'Cut-off Pressure','type':'float','value':1}
-        ]},
-            {'name':'Cryo Setpoint','type':'group','children':[
-                {'name':'Control Loop','type':'int','value':1},
-                {'name':'Ramp Enable','type':'bool','value':True},
-                {'name':'Ramp Rate (K/min)','type':'float','value':2},
-                {'name':'Setpoint (K)','type':'float','value':300}
-            ]}
+        ]}
+            # {'name':'Cryo Setpoint','type':'group','children':[
+            #     {'name':'Control Loop','type':'int','value':1},
+            #     {'name':'Ramp Enable','type':'bool','value':True},
+            #     {'name':'Ramp Rate (K/min)','type':'float','value':2},
+            #     {'name':'Setpoint (K)','type':'float','value':300}
+            # ]}
         ]
         self.p = Parameter.create(name='self.params',type='group',children=self.params)
         self.setParameters(self.p,showTop=False)
@@ -131,6 +131,23 @@ class ProcessTree(ParameterTree):
 
     def getH2DoseValue(self,child):
         return self.p.param('Dose H2',child).value()
+
+
+
+class CryoTree(ParameterTree):
+
+    def __init__(self):
+        super().__init__()
+        self.params = [{'name':'Cryo Setpoint','type':'group','children':[
+                {'name':'Control Loop','type':'int','value':1},
+                {'name':'Ramp Enable','type':'bool','value':True},
+                {'name':'Ramp Rate (K/min)','type':'float','value':2},
+                {'name':'Setpoint (K)','type':'float','value':300},
+                {'name':'Heater Range','type':'list','limits':['Off','Low','Med','High']}
+            ]}
+        ]
+        self.p = Parameter.create(name='self.params',type='group',children=self.params)
+        self.setParameters(self.p,showTop=False)
     
     def getCryoValue(self,child):
         return self.p.param('Cryo Setpoint',child).value()

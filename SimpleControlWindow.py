@@ -274,18 +274,27 @@ class SimpleControlWindow(qw.QMainWindow):
         masterLayoutcp.addWidget(cpgroup)
         self.cpressBox.setLayout(masterLayoutcp)
 
+        # self.flow = qw.QLabel('0.0')
+        # self.flowBox = qw.QWidget()
+        # masterLayoutflow = qw.QVBoxLayout()
+        # flowLayout = qw.QVBoxLayout()
+        # flowgroup = qw.QGroupBox('Measured Flow')
+        # flowgroup.setLayout(flowLayout)
+        # flowLayout.addWidget(self.flow)
+        # masterLayoutflow.addWidget(flowgroup)
+        # self.flowBox.setLayout(masterLayoutflow)
+
         self.flow = qw.QLabel('0.0')
+        self.vol = qw.QLabel('0.0')
         self.flowBox = qw.QWidget()
         masterLayoutflow = qw.QVBoxLayout()
-        flowLayout = qw.QVBoxLayout()
+        flowLayout = qw.QGridLayout()
         flowgroup = qw.QGroupBox('Measured Flow')
         flowgroup.setLayout(flowLayout)
-        flowLayout.addWidget(self.flow)
+        flowLayout.addWidget(self.flow,  0,0,1,1)
+        flowLayout.addWidget(self.vol,   1,0,1,1)
         masterLayoutflow.addWidget(flowgroup)
         self.flowBox.setLayout(masterLayoutflow)
-
-        # self.rpresslabel = qw.QLabel('Rxn Pressure')
-        # self.cpresslabel = qw.QLabel('Cryo Pressure')
     
 
         for r in range(10):
