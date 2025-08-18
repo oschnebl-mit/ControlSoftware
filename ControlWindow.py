@@ -122,7 +122,7 @@ class MainControlWindow(qw.QMainWindow):
                 print("Failed to connect to MKS902 gauge.")
             try:
                 self.b0254 = Brooks0254(self.testing,self.logger,    'ASRL8::INSTR') ## 
-                self.mfcButton.clicked.connect(self.setupMFCs)
+                self.setRateButton.clicked.connect(self.setAr)
             except:
                 self.b0254 = 'Brooks0254'
                 print("Failed to connect to Brooks0254 MFC controller.")
@@ -133,8 +133,10 @@ class MainControlWindow(qw.QMainWindow):
                 self.ls335 = 'Model335'
                 print("Failed to connect to Lakeshore cryo controller.")
             try:
-                self.daq = DAQ(self.testing,self.logger,self.testing)
+                self.daq = DAQ(self.testing,self.logger)
+                self.testDAQ0Button.clicked.connect(self.toggle_relay0)
                 self.testDAQ1Button.clicked.connect(self.toggle_relay1)
+                self.testDAQ2Button.clicked.connect(self.toggle_relay2)
             except:
                 self.daq = 'DAQ'
                 print("Failed to connect to DAQ")
@@ -158,8 +160,7 @@ class MainControlWindow(qw.QMainWindow):
                 self.testDAQ2Button.clicked.connect(self.toggle_relay2)
     
                 self.b0254 = Brooks0254(self.logger, 'ASRL8::INSTR') ## 
-                self.mfcButton.clicked.connect(self.setupMFCs)
-
+                # self.mfcButton.clicked.connect(self.setupMFCs)
                 
             except OSError as e:
                 self.logger.exception(e)
@@ -252,10 +253,10 @@ class MainControlWindow(qw.QMainWindow):
         self.dose_thread.running = False
 
     def change_cryo(self):
-        loop = self.processTree.getCryoValue('Control Loop')
-        ramp_enable = self.processTree.getCryoValue('Control Loop')
-        ramp_rate = self.processTree.getCryoValue('Ramp Rate (K/min)')
-        setpoint = self.processTree.getCryoValue('Setpoint (K)')
+        loop = self.cryoTree.getCryoValue('Control Loop')
+        ramp_enable = self.cryoTree.getCryoValue('Control Loop')
+        ramp_rate = self.cryoTree.getCryoValue('Ramp Rate (K/min)')
+        setpoint = self.cryoTree.getCryoValue('Setpoint (K)')
         self.ls335.set_setpoint_ramp_parameter(loop,ramp_enable,ramp_rate)
         self.ls335.set_control_setpoint(loop, setpoint)
         self.logger.info(f'Setting cryostat loop {loop} to {setpoint} K at rate of {ramp_rate} K/min')

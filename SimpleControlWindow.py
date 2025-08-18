@@ -145,7 +145,7 @@ class SimpleControlWindow(qw.QMainWindow):
 
     def initInstruments(self):
         try:
-            self.b0254 = Brooks0254(False, self.logger,    'ASRL8::INSTR') ## 
+            self.b0254 = Brooks0254(False, self.logger,'ASRL8::INSTR') ## 
             self.setRateButton.clicked.connect(self.setAr)
             self.doseArButton.clicked.connect(self.doseAr)
             self.abortButton.clicked.connect(self.abort)

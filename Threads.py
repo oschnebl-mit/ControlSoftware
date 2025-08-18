@@ -37,7 +37,7 @@ class LoggingThread(QtCore.QThread):
             try:
                 self.rxnPressure = rxnGauge
                 pressure = self.rxnPressure.get_pressure()
-                print('successfully connected to MKS902 piezo, read pressure = ', pressure)
+                print('Successfully connected to MKS902 piezo, read pressure = ', pressure)
             except (OSError, AttributeError) as e:
                 self.logger.exception(e)
             try:
@@ -45,16 +45,18 @@ class LoggingThread(QtCore.QThread):
                 # self.cryoPressure.test()
                 pressure = self.cryoPressure.get_pressure()
                 # self.new_cryo_pressure_data.emit(pressure)
-                print('successfully connected to MKS925 pirani, read pressure = ', pressure)
+                print('Successfully connected to MKS925 pirani, read pressure = ', pressure)
             except (OSError, AttributeError) as e:
                 self.logger.exception(e)
-            # try:
-            #     self.mfcControl = mfcControl
-            #     flow = self.mfcControl.MFC1.get_measured_values()
-                
-            #     print('successfully connected to Brooks0254, read values = ', flow)
-            # except (OSError,AttributeError) as e:
-            #     self.logger.exception(e)
+
+            try:
+                self.b0254 = mfcControl
+                sccm, tot, time = self.b0254.MFC2.get_measured_values()
+                print(f'Successfully connected to B0254, read MFC2 at {sccm} sccm')
+            except(OSError, AttributeError) as e:
+                self.logger.exception(e)
+                self.b0254 = 'Brooks0254'
+            
             timestr = strftime('%Y%m%d-%H%M%S')
             self.log_path = f'logs/CryoTest_{timestr}.csv'
             
