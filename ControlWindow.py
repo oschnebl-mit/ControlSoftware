@@ -105,7 +105,7 @@ class MainControlWindow(qw.QMainWindow):
         self.dose_thread.running = False
         self.currentProcessPlot_grp.group.setTitle("Process aborted")
         #self.process_thread.running=False
-        self.daq.close_connections()
+        # self.daq.close_connections()
         if not self.testing:
             self.b0254.closeAll()
             self.daq.close_relay1()
@@ -151,19 +151,22 @@ class MainControlWindow(qw.QMainWindow):
                 self.ls335 = Model335(57600)
                 self.setCryoButton.clicked.connect(self.change_cryo)
 
-                self.mks902 = PressureGauge(self.logger,'COM3') 
-                self.mks925 = PressureGauge(self.logger,'COM5')
+                self.mks902 = PressureGauge(self.testing,self.logger,'COM3') 
+                self.mks925 = PressureGauge(self.testing,self.logger,'COM5')
 
-                self.daq = DAQ(self.logger,self.testing)
+                self.daq = DAQ(self.testing,self.logger)
                 self.testDAQ0Button.clicked.connect(self.toggle_relay0)
                 self.testDAQ1Button.clicked.connect(self.toggle_relay1)
                 self.testDAQ2Button.clicked.connect(self.toggle_relay2)
     
-                self.b0254 = Brooks0254(self.logger, 'ASRL8::INSTR') ## 
+                self.b0254 = Brooks0254(self.testing,self.logger, 'ASRL8::INSTR') ## 
                 # self.mfcButton.clicked.connect(self.setupMFCs)
                 
-            except OSError as e:
+            except (OSError,Exception) as e:
                 self.logger.exception(e)
+                print("Failed to connect to instrument")
+                self.close()
+
 
         
         self.logging_thread = LoggingThread(self.logger,self.ls335,self.b0254,self.mks902,self.mks925,self.save_csv.isChecked(),self.logging_delay,self.testing) 
@@ -292,9 +295,9 @@ class MainControlWindow(qw.QMainWindow):
         self.cryoVac_plot.setXLink(self.cryoTemp_plot)
         self.rxnVac_plot.setXLink(self.rxnTemp_plot)
 
-        self.currentProcessPlot_grp = BoxedPlot('Current Process','#08F7FE')
-        self.currentProcessPlot = self.currentProcessPlot_grp.plot
-        self.cp2 = None
+        # self.currentProcessPlot_grp = BoxedPlot('Current Process','#08F7FE')
+        # self.currentProcessPlot = self.currentProcessPlot_grp.plot
+        # self.cp2 = None
 
         self.save_csv = qw.QCheckBox('Save to csv')
         self.logInput = qw.QLineEdit('30')
@@ -326,6 +329,13 @@ class MainControlWindow(qw.QMainWindow):
         masterLayoutflow.addWidget(flowgroup)
         self.flowBox.setLayout(masterLayoutflow)
 
+        plotlayout = qw.QVBoxLayout()
+        self.plotgroup = qw.QWidget()
+        plotlayout.addWidget(self.cryoTemp_grp)
+        plotlayout.addWidget(self.rxnTemp_grp)
+        plotlayout.addWidget(self.rxnVac_grp)
+        plotlayout.addWidget(self.cryoVac_grp)
+        self.plotgroup.setLayout(plotlayout)
 
         self.testDAQ0Button = qw.QPushButton("Toggle DAQ Relay 0")
         self.testDAQ0Button.setCheckable(True)
@@ -344,12 +354,14 @@ class MainControlWindow(qw.QMainWindow):
 
         '''
         ## Fix the row widths to be more uniform
-        for r in range(21):
-            layout.setRowMinimumHeight(r,1)
-        
+        for r in range(9):
+            # layout.setRowMinimumHeight(r,1)
+            layout.setRowStretch(r,1)
+        # for c in range(4):
+        #     layout.setColumnStretch(c,1)
         layout.setColumnStretch(0,1)
-        layout.setColumnStretch(1,2)
-        layout.setColumnStretch(2,2)
+        layout.setColumnStretch(1,1)
+        layout.setColumnStretch(2,1)
         layout.setColumnStretch(3,3)
         
         layout.setContentsMargins(1,0,1,0)
@@ -360,7 +372,7 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.logButton,       2,0,1,1)
         layout.addWidget(self.save_csv,        3,0,1,1)
         layout.addWidget(self.setCryoButton,   4,0,1,1)
-        layout.addWidget(self.cryoTree,        5,0,10,1)
+        layout.addWidget(self.cryoTree,        5,0,3,2)
 
         ### Middle Column
         layout.addWidget(self.rateInput,       1,1,1,1)
@@ -372,13 +384,14 @@ class MainControlWindow(qw.QMainWindow):
 
         
         ## current process plot middle bottom (start at row 8, col 1)
-        layout.addWidget(self.currentProcessPlot_grp,8,1,10,2)
+        # layout.addWidget(self.currentProcessPlot_grp,8,1,10,2)
 
         ## Right Hand column of plots
-        layout.addWidget(self.cryoTemp_grp,    0, 3,5,1)
-        layout.addWidget(self.cryoVac_grp,     5, 3,5,1)
-        layout.addWidget(self.rxnTemp_grp,     10,3,5,1)
-        layout.addWidget(self.rxnVac_grp,      15,3,5,1)
+        layout.addWidget(self.plotgroup,       0, 3,10,1)
+        # layout.addWidget(self.cryoTemp_grp,    0, 3,1,2)
+        # layout.addWidget(self.cryoVac_grp,     2, 3,3,2)
+        # layout.addWidget(self.rxnTemp_grp,     5, 3,3,2)
+        # layout.addWidget(self.rxnVac_grp,      8, 3,3,2)
 
     def closeEvent(self,event):
         if self.testing:

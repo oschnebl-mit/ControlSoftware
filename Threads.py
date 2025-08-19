@@ -42,9 +42,7 @@ class LoggingThread(QtCore.QThread):
                 self.logger.exception(e)
             try:
                 self.cryoPressure = cryoGauge
-                # self.cryoPressure.test()
                 pressure = self.cryoPressure.get_pressure()
-                # self.new_cryo_pressure_data.emit(pressure)
                 print('Successfully connected to MKS925 pirani, read pressure = ', pressure)
             except (OSError, AttributeError) as e:
                 self.logger.exception(e)
@@ -81,6 +79,10 @@ class LoggingThread(QtCore.QThread):
                     'Reaction Temperature':rxn_temp,
                     'Cryo Temperature':cryo_temp
                         }
+                    if self.b0254 != 'Brooks0254':
+                        sccm, tot, time = self.b0254.MFC2.get_measured_values()
+                        log_dict['Ar sccm'] = sccm
+                        self.new_flow_data.emit(sccm)
                     with open(self.log_path,'a',newline='') as csvfile:
                         w = csv.DictWriter(csvfile, log_dict.keys())
                         if row == 0:
@@ -95,6 +97,7 @@ class LoggingThread(QtCore.QThread):
                     self.new_cryo_temp_data.emit(170+rng.random())
                     self.new_rxn_pressure_data.emit(1*rng.random())
                     self.new_cryo_pressure_data.emit(0.1*rng.random())
+                    self.new_flow_data.emit(1.0)
             else:
                 cryo_temp = float(self.cryoControl.query('KRDG? A',check_errors=False))
                 rxn_temp = float(self.cryoControl.query("KRDG? B", check_errors=False))
