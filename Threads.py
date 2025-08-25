@@ -74,10 +74,11 @@ class LoggingThread(QtCore.QThread):
                     self.new_cryo_pressure_data.emit(self.cryoPressure.get_pressure())
                     self.new_rxn_pressure_data.emit(self.rxnPressure.get_pressure())
                     log_dict = {
-                    'Reaction Pressure':self.rxnPressure.get_pressure(),
-                    'Cryo Pressure':self.cryoPressure.get_pressure(),
-                    'Reaction Temperature':rxn_temp,
-                    'Cryo Temperature':cryo_temp
+                        'Time':strftime('%H%M%S'),
+                        'Reaction Pressure':self.rxnPressure.get_pressure(),
+                        'Cryo Pressure':self.cryoPressure.get_pressure(),
+                        'Reaction Temperature':rxn_temp,
+                        'Cryo Temperature':cryo_temp
                         }
                     if self.b0254 != 'Brooks0254':
                         sccm, tot, time = self.b0254.MFC2.get_measured_values()
