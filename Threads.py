@@ -8,7 +8,7 @@ class LoggingThread(QtCore.QThread):
     ''' Periodically asks for data from pressure gauge, furnace, and MFCS. Passes measured data and overpressure alarm to main window'''
     new_rxn_temp_data = QtCore.pyqtSignal(float)
     new_cryo_temp_data = QtCore.pyqtSignal(float)
-    new_flow_data = QtCore.pyqtSignal(object) ## not sure how I'll handle gases yet
+    new_flow_data = QtCore.pyqtSignal(tuple) ## not sure how I'll handle gases yet
     new_rxn_pressure_data = QtCore.pyqtSignal(float)
     new_cryo_pressure_data = QtCore.pyqtSignal(float)
 
@@ -67,23 +67,29 @@ class LoggingThread(QtCore.QThread):
             if self.testing:
                 rng = np.random.default_rng()
                 try:
-                    cryo_temp = float(self.cryoControl.query('KRDG? A',check_errors=False))
-                    rxn_temp = float(self.cryoControl.query("KRDG? B", check_errors=False))
-                    self.new_cryo_temp_data.emit(cryo_temp)
-                    self.new_rxn_temp_data.emit(rxn_temp)
+                    print("logging")
                     self.new_cryo_pressure_data.emit(self.cryoPressure.get_pressure())
                     self.new_rxn_pressure_data.emit(self.rxnPressure.get_pressure())
                     log_dict = {
                         'Time':strftime('%H%M%S'),
                         'Reaction Pressure':self.rxnPressure.get_pressure(),
                         'Cryo Pressure':self.cryoPressure.get_pressure(),
-                        'Reaction Temperature':rxn_temp,
-                        'Cryo Temperature':cryo_temp
                         }
+                    if self.cryoControl != 'Model335':
+                        print("testing cry log")
+                        cryo_temp = float(self.cryoControl.query('KRDG? A',check_errors=False))
+                        rxn_temp = float(self.cryoControl.query("KRDG? B", check_errors=False))
+                        self.new_cryo_temp_data.emit(cryo_temp)
+                        self.new_rxn_temp_data.emit(rxn_temp)
+                        log_dict['Cryo Temperature'] = cryo_temp
+                        log_dict['Reaction Temperature'] = rxn_temp
                     if self.b0254 != 'Brooks0254':
-                        sccm, tot, time = self.b0254.MFC2.get_measured_values()
-                        log_dict['Ar sccm'] = sccm
-                        self.new_flow_data.emit(sccm)
+                        print("testing MFC")
+                        Ar_sccm, tot, time = self.b0254.MFC2.get_measured_values()
+                        log_dict['Ar sccm'] = Ar_sccm
+                        H2S_sccm, tot, time = self.b0254.MFC1.get_measured_values()
+                        log_dict['H2S sccm'] = H2S_sccm
+                        self.new_flow_data.emit((Ar_sccm,H2S_sccm))
                     with open(self.log_path,'a',newline='') as csvfile:
                         w = csv.DictWriter(csvfile, log_dict.keys())
                         if row == 0:
@@ -93,29 +99,35 @@ class LoggingThread(QtCore.QThread):
                                     # quotechar='|', quoting=csv.QUOTE_MINIMAL)
                         row +=1 
                 except (OSError,AttributeError) as e:
+                    print("error")
                     self.logger.exception(e)
                     self.new_rxn_temp_data.emit(200+rng.random())
                     self.new_cryo_temp_data.emit(170+rng.random())
                     self.new_rxn_pressure_data.emit(1*rng.random())
                     self.new_cryo_pressure_data.emit(0.1*rng.random())
-                    self.new_flow_data.emit(1.0)
+                    self.new_flow_data.emit((1.0,0.0))
             else:
-                cryo_temp = float(self.cryoControl.query('KRDG? A',check_errors=False))
-                rxn_temp = float(self.cryoControl.query("KRDG? B", check_errors=False))
+                self.new_cryo_pressure_data.emit(self.cryoPressure.get_pressure())
+                self.new_rxn_pressure_data.emit(self.rxnPressure.get_pressure())
                 log_dict = {
+                    'Time':strftime('%H%M%S'),
                     'Reaction Pressure':self.rxnPressure.get_pressure(),
                     'Cryo Pressure':self.cryoPressure.get_pressure(),
-                    'Reaction Temperature':rxn_temp,
-                    'Cryo Temperature':cryo_temp
-                }
+                    }
+                if self.cryoControl != 'Model335':
+                    cryo_temp = float(self.cryoControl.query('KRDG? A',check_errors=False))
+                    rxn_temp = float(self.cryoControl.query("KRDG? B", check_errors=False))
+                    self.new_cryo_temp_data.emit(cryo_temp)
+                    self.new_rxn_temp_data.emit(rxn_temp)
+                    log_dict['Cryo Temperature'] = cryo_temp
+                    log_dict['Reaction Temperature'] = rxn_temp
                 if self.b0254 != 'Brooks0254':
-                    sccm, tot, time = self.b0254.MFC2.get_measured_values()
-                    log_dict['Ar sccm'] = sccm
-                    self.new_flow_data.emit(sccm)
-                self.new_rxn_pressure_data.emit(log_dict['Reaction Pressure'])
-                self.new_cryo_pressure_data.emit(log_dict['Cryo Pressure'])
-                self.new_cryo_temp_data.emit(cryo_temp)
-                self.new_rxn_temp_data.emit(rxn_temp)
+                    Ar_sccm, tot, time = self.b0254.MFC2.get_measured_values()
+                    log_dict['Ar sccm'] = Ar_sccm
+                    H2S_sccm, tot, time = self.b0254.MFC1.get_measured_values()
+                    log_dict['H2S sccm'] = H2S_sccm
+                    self.new_flow_data.emit((Ar_sccm,H2S_sccm))
+
                 if self.save_csv:
                     with open(self.log_path,'a',newline='') as csvfile:
                             w = csv.DictWriter(csvfile, log_dict.keys())

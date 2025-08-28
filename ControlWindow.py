@@ -88,10 +88,13 @@ class MainControlWindow(qw.QMainWindow):
             self.daq.open_relay2()
 
     def updateFlow(self,new_data):
-        self.flow.setText(str(new_data))
-        old_total = float(self.vol.text())
-        new_total = old_total + self.logging_delay/60*new_data
-        self.vol.setText(str(new_total))
+        (Ar_sccm,H2S_sccm) = new_data
+        self.Arflow.setText(str(Ar_sccm))
+        self.H2Sflow.setText(str(H2S_sccm))
+        # self.flow.setText(str(new_data))
+        # old_total = float(self.vol.text())
+        # new_total = old_total + self.logging_delay/60*new_data
+        # self.vol.setText(str(new_total))
 
     def updateLogInterval(self):
         self.logging_delay = int(self.logInput.text())
@@ -122,7 +125,8 @@ class MainControlWindow(qw.QMainWindow):
                 print("Failed to connect to MKS902 gauge.")
             try:
                 self.b0254 = Brooks0254(self.testing,self.logger,    'ASRL8::INSTR') ## 
-                self.setRateButton.clicked.connect(self.setAr)
+                self.setArRateButton.clicked.connect(self.setAr)
+                self.setH2SRateButton.clicked.connect(self.setH2S)
             except:
                 self.b0254 = 'Brooks0254'
                 print("Failed to connect to Brooks0254 MFC controller.")
@@ -160,7 +164,8 @@ class MainControlWindow(qw.QMainWindow):
                 self.testDAQ2Button.clicked.connect(self.toggle_relay2)
     
                 self.b0254 = Brooks0254(self.testing,self.logger, 'ASRL8::INSTR') ## 
-                # self.mfcButton.clicked.connect(self.setupMFCs)
+                self.setArRateButton.clicked.connect(self.setAr)
+                self.setH2SRateButton.clicked.connect(self.setH2S)
                 
             except (OSError,Exception) as e:
                 self.logger.exception(e)
@@ -174,9 +179,14 @@ class MainControlWindow(qw.QMainWindow):
         self.dose_thread = DoseThread(self.testing, self.logger, self.b0254,self.mks925,self.daq, self.ls335)
 
     def setAr(self):
-        self.rate = float(self.rateInput.text())
-        self.b0254.MFC2.set_sccm(self.rate)
-        self.logger.info(f'Setting Ar to {self.rate} sccm')
+        self.ArRate = float(self.ArRateInput.text())
+        self.b0254.MFC2.set_sccm(self.ArRate)
+        self.logger.info(f'Setting Ar to {self.ArRate} sccm')
+
+    def setH2S(self):
+        self.H2SRate = float(self.H2SRateInput.text())
+        self.b0254.MFC1.set_sccm(self.H2SRate)
+        self.logger.info(f'Setting H2S to {self.H2SRate} sccm')
        
     
     def runPurge(self):
@@ -309,23 +319,28 @@ class MainControlWindow(qw.QMainWindow):
         # self.logButton.setChecked(False)
         self.abortButton = qw.QPushButton("Stop Process")
 
-        self.setRateButton = qw.QPushButton("Set Ar sccm")
-        self.rateInput = qw.QLineEdit("1.0")
-        self.rateInput.setValidator(QtGui.QDoubleValidator())
+        self.setArRateButton = qw.QPushButton("Set Ar sccm")
+        self.ArRateInput = qw.QLineEdit("1.0")
+        self.ArRateInput.setValidator(QtGui.QDoubleValidator())
+        self.setH2SRateButton = qw.QPushButton("Set H2S sccm")
+        self.H2SRateInput = qw.QLineEdit("1.0")
+        self.H2SRateInput.setValidator(QtGui.QDoubleValidator())
 
-        self.flow = qw.QLabel('0.0')
-        self.flow_units = qw.QLabel('sccm')
-        self.vol = qw.QLabel('0.0')
-        self.vol_units = qw.QLabel('cm3')
+        self.Arflow = qw.QLabel('0.0')
+        self.Arflow_units = qw.QLabel('sccm Ar')
+        # self.vol = qw.QLabel('0.0')
+        # self.vol_units = qw.QLabel('cm3')
+        self.H2Sflow = qw.QLabel('0.0')
+        self.H2Sflow_units = qw.QLabel('sccm H2S')
         self.flowBox = qw.QWidget()
         masterLayoutflow = qw.QVBoxLayout()
         flowLayout = qw.QGridLayout()
         flowgroup = qw.QGroupBox('Measured Flow')
         flowgroup.setLayout(flowLayout)
-        flowLayout.addWidget(self.flow,       0,0,1,1)
-        flowLayout.addWidget(self.vol,        1,0,1,1)
-        flowLayout.addWidget(self.flow_units, 0,1,1,1)
-        flowLayout.addWidget(self.vol_units,  1,1,1,1)
+        flowLayout.addWidget(self.Arflow,       0,0,1,1)
+        flowLayout.addWidget(self.H2Sflow,        1,0,1,1)
+        flowLayout.addWidget(self.Arflow_units, 0,1,1,1)
+        flowLayout.addWidget(self.H2Sflow_units,  1,1,1,1)
         masterLayoutflow.addWidget(flowgroup)
         self.flowBox.setLayout(masterLayoutflow)
 
@@ -371,16 +386,19 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.logInput,        1,0,1,1)
         layout.addWidget(self.logButton,       2,0,1,1)
         layout.addWidget(self.save_csv,        3,0,1,1)
-        layout.addWidget(self.setCryoButton,   4,0,1,1)
-        layout.addWidget(self.cryoTree,        5,0,3,2)
+        layout.addWidget(self.testDAQ0Button,  4,0,1,1)
+        layout.addWidget(self.testDAQ1Button,  5,0,1,1)
+        layout.addWidget(self.testDAQ2Button,  6,0,1,1)
+        layout.addWidget(self.setCryoButton,   7,0,1,1)
+        layout.addWidget(self.cryoTree,        8,0,3,2)
 
         ### Middle Column
-        layout.addWidget(self.rateInput,       1,1,1,1)
-        layout.addWidget(self.setRateButton,   1,2,1,1)
-        layout.addWidget(self.flowBox,         2,1,2,2)
-        layout.addWidget(self.testDAQ0Button,  4,2,1,1)
-        layout.addWidget(self.testDAQ1Button,  5,2,1,1)
-        layout.addWidget(self.testDAQ2Button,  6,2,1,1)
+        layout.addWidget(self.ArRateInput,       1,1,1,1)
+        layout.addWidget(self.setArRateButton,   1,2,1,1)
+        layout.addWidget(self.H2SRateInput,      2,1,1,1)
+        layout.addWidget(self.setH2SRateButton,  2,2,1,1)
+        layout.addWidget(self.flowBox,           3,1,2,2)
+
 
         
         ## current process plot middle bottom (start at row 8, col 1)
