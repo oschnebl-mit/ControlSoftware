@@ -133,6 +133,9 @@ class MainControlWindow(qw.QMainWindow):
                 self.testDAQ0Button.clicked.connect(self.toggle_relay0)
                 self.testDAQ1Button.clicked.connect(self.toggle_relay1)
                 self.testDAQ2Button.clicked.connect(self.toggle_relay2)
+                self.testDAQ0Button.setChecked(self.daq.relay0.read())
+                self.testDAQ1Button.setChecked(self.daq.relay1.read())
+                self.testDAQ2Button.setChecked(self.daq.relay2.read())
             except:
                 self.daq = 'DAQ'
                 print("Failed to connect to DAQ")
