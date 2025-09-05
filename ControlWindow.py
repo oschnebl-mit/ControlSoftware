@@ -6,6 +6,7 @@ import pyqtgraph as pg
 import numpy as np
 import logging
 from Control_Parameters import CryoTree
+from Plots import LoggingPlot, BoxedPlot
 # from Control_Parameters import CtrlParamTree, ProcessTree
 # from Brooks0254_BuildUp import Brooks0254, MassFlowController
 # from PressureGauge_BuildUp import PressureGauge
@@ -67,21 +68,19 @@ class MainControlWindow(qw.QMainWindow):
         if self.daq.relay0.read():
             self.logger.info('relay0 is open, closing relay')
             self.daq.close_relay0()
-            # self.testDAQ0Button.setChecked(False)
+
         else:
             self.logger.info('relay0 is closed, opening relay')
             self.daq.open_relay0()
-            # self.testDAQ0Button.setChecked(True)
 
     def toggle_relay1(self):
         if self.daq.relay1.read():
             self.logger.info('relay1 is open, closing relay')
             self.daq.close_relay1()
-            # self.testDAQ1Button.setChecked(False)
+
         else:
             self.logger.info('relay1 is closed, opening relay')
             self.daq.open_relay1()
-            # self.testDAQ1Button.setChecked(True)
 
     def toggle_relay2(self):
         if self.daq.relay2.read():
@@ -281,10 +280,10 @@ class MainControlWindow(qw.QMainWindow):
         layout = qw.QGridLayout()  # All the widgets will be in a grid in the main box
         self.mainbox.setLayout(layout)  # set the layout
 
-        self.cryoTemp_grp = LoggingPlot('Cryo Temperature','#08F7FE')
+        self.cryoTemp_grp = LoggingPlot('Cryo Temperature',"#FF035B")
         self.cryoVac_grp = LoggingPlot('Cryo Vacuum','#08F7FE')
         self.rxnVac_grp = LoggingPlot('Process Pressure','#08F7FE')
-        self.rxnTemp_grp = LoggingPlot('Process Temperature','#08F7FE')
+        self.rxnTemp_grp = LoggingPlot('Process Temperature','#FF035B')
         self.cryoTemp_plot = self.cryoTemp_grp.plot
         self.cryoVac_plot = self.cryoVac_grp.plot
         self.rxnVac_plot = self.rxnVac_grp.plot
@@ -436,83 +435,6 @@ class MainControlWindow(qw.QMainWindow):
         self.daq.close_connections()
         event.accept()
 
-
-class BoxedPlot(qw.QWidget):
-    def __init__(self, plot_title, color):
-        super().__init__()
-        masterLayout = qw.QVBoxLayout()
-        self.pen = pg.mkPen(color, width=2)
-
-        layout = qw.QVBoxLayout()
-        self.group = qw.QGroupBox(plot_title)
-        self.plot = pg.PlotWidget()
-        self.plot.getPlotItem().showGrid(x=True, y=True, alpha=1)
-        self.plot.getPlotItem().showAxis('right')
-        if "qdarkstyle" in sys.modules:
-            self.plot.setBackground((25, 35, 45))
-        self.group.setLayout(layout)
-        self.message = qw.QLabel("Inactive")
-        layout.addWidget(self.message)
-        layout.addWidget(self.plot)
-        masterLayout.addWidget(self.group)
-
-        self.setLayout(masterLayout)
-    
-    # def set_title(self,new_title):
-
-
-    def update_plot(self,new_data):
-        print(f'Add to plot {new_data}')
-        xdata,ydata = self.trace.getData()
-        xdata = np.append(xdata,t.time())
-        ydata = np.append(ydata,new_data)
-        self.trace.setData(x=xdata, y=ydata)
-        # self.plot.getViewBox().autoRange()
-
-    def update_xy(self,new_data,emphasize_last=True):
-        # instead of time series updates x-y data
-        xdata,ydata = self.trace.getData()
-        xdata = np.append(xdata,new_data[0])
-        ydata = np.append(ydata,new_data[1])
-        self.trace.setData(x=xdata,y=ydata)
-        if emphasize_last:
-            self.last_point.setData(x=[new_data[0]],y=[new_data[1]])
-        
-class LoggingPlot(qw.QWidget):
-    def __init__(self, plot_title, color):
-        super().__init__()
-        masterLayout = qw.QVBoxLayout()
-        self.pen = pg.mkPen(color, width=1)
-        self.brush = pg.mkBrush(color)
-        layout = qw.QVBoxLayout()
-        self.group = qw.QGroupBox(plot_title)
-        self.plot = pg.PlotWidget()
-        self.plot.getPlotItem().showAxis('right')
-        # self.trace = pg.PlotCurveItem(pen=self.pen)
-        self.trace = pg.PlotDataItem(pen=self.pen,symbol='o',symbolBrush=self.brush) ## trying this to have points and lines
-        self.plot.addItem(self.trace)
-        # self.trace.setSkipFiniteCheck(True)
-        self.plot.getPlotItem().showGrid(x=True, y=True, alpha=0.5)
-        if "qdarkstyle" in sys.modules:
-            self.plot.setBackground((25, 35, 45))
-
-        self.group.setLayout(layout)
-        layout.addWidget(self.plot)
-        masterLayout.addWidget(self.group)
-
-        self.setLayout(masterLayout)
-
-    def update_plot(self,new_data):
-        xdata,ydata = self.trace.getData()
-        if xdata is None:
-            xdata = np.array([t.time()])
-            ydata = np.array([new_data])
-        else:
-            xdata = np.append(xdata,t.time())
-            ydata = np.append(ydata,new_data)
-        # print(f'Add to plot: ({xdata},{ydata})')
-        self.trace.setData(x=xdata, y=ydata)
-        self.plot.getViewBox().autoRange()
 
 
 if __name__ == "__main__":

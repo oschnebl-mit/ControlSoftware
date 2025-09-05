@@ -58,13 +58,13 @@ class DAQ():
 
     def open_relay2(self):
         self.logger.info('Write True at relay 2 to open')
-        self.relay2.write(True)
-        self.relay2open = True
+        if not self.virtual:
+            self.relay2.write(True)        
     
     def close_relay2(self):
         self.logger.info('Write False at relay 2 to close')
-        self.relay2.write(False)
-        self.relay2open = False
+        if not self.virtual:
+            self.relay2.write(False)
 
     def test_relay1(self):
         print("Testing relay 1")

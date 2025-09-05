@@ -30,6 +30,7 @@ class SetupTab(qw.QWidget):
         self.mfcButton = qw.QPushButton("Re-initialize MFCs")
         self.mks925Button = qw.QPushButton("Re-initialize MKS925 (Pirani)")
         self.mks902Button = qw.QPushButton("Re-initialize MKS902B (Piezo)")
+        
 
         self.processTree = ProcessTree()
 
