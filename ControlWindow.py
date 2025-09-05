@@ -448,7 +448,7 @@ class BoxedPlot(qw.QWidget):
 
 
     def update_plot(self,new_data):
-        # print(f'Add to plot {new_data}')
+        print(f'Add to plot {new_data}')
         xdata,ydata = self.trace.getData()
         xdata = np.append(xdata,t.time())
         ydata = np.append(ydata,new_data)
@@ -489,7 +489,7 @@ class LoggingPlot(qw.QWidget):
 
     def update_plot(self,new_data):
         xdata,ydata = self.trace.getData()
-        # print(xdata,ydata)
+        print(f'Add to plot: {xdata,ydata}')
         if xdata is None:
             xdata = np.array([t.time()])
             ydata = np.array([new_data])
