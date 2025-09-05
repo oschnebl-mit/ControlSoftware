@@ -1,4 +1,4 @@
-import sys,qdarkstyle
+import sys,qdarkstyle, os
 import time as t
 from PyQt5 import QtGui,QtCore
 import PyQt5.QtWidgets as qw 
@@ -14,6 +14,10 @@ from Threads import LoggingThread, PurgeThread, DoseThread
 from Instruments import PressureGauge, DAQ, Brooks0254
 from lakeshore import Model335
 
+os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"]= "1"
+os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "1"
+
+
 class MainControlWindow(qw.QMainWindow):
     def __init__(self, logger, testing = False):
         ## Add log_path eventually
@@ -25,8 +29,8 @@ class MainControlWindow(qw.QMainWindow):
 
         self.resize(1280,720) # non-maximized state
         # self.resize(2560, 1440)  # for home monitor
-        if self.testing == False:
-            self.showMaximized()
+        # if self.testing == False:
+        # self.showMaximized()
 
         self.initUI()
 
@@ -414,7 +418,7 @@ class MainControlWindow(qw.QMainWindow):
     def closeEvent(self,event):
         if self.testing:
             print("trying to close gracefully")
-       
+        
         self.logger.info(f'Closing serial connections and GUI window.')
         self.mks902._connection.close()
         self.mks925._connection.close()
@@ -489,16 +493,15 @@ class LoggingPlot(qw.QWidget):
 
     def update_plot(self,new_data):
         xdata,ydata = self.trace.getData()
-        print(f'Add to plot: {xdata,ydata}')
         if xdata is None:
             xdata = np.array([t.time()])
             ydata = np.array([new_data])
         else:
             xdata = np.append(xdata,t.time())
             ydata = np.append(ydata,new_data)
-        # print(xdata,ydata)
+        # print(f'Add to plot: ({xdata},{ydata})')
         self.trace.setData(x=xdata, y=ydata)
-        # self.plot.getViewBox().autoRange()
+        self.plot.getViewBox().autoRange()
 
 
 if __name__ == "__main__":
@@ -509,7 +512,9 @@ if __name__ == "__main__":
     logger.addHandler(logging.NullHandler())
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
-
+    font = QtGui.QFont()
+    font.setPointSize(12)   # try 12–14 instead of default ~8–9
+    app.setFont(font)
     window = MainControlWindow(logger = logger, testing = True)
     
     sys.exit(app.exec())
