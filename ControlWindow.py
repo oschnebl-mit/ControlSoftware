@@ -105,19 +105,7 @@ class MainControlWindow(qw.QMainWindow):
         self.logging_thread.delay = self.logging_delay
         print(f'Updating log interval to {self.logging_delay}s')
 
-    def abortAll(self):
-        ## Stop all processes (except logging) and close all valves
-        ## any other safety things? change cryo?
-        self.purge_thread.running = False
-        self.dose_thread.running = False
-        self.currentProcessPlot_grp.group.setTitle("Process aborted")
-        #self.process_thread.running=False
-        # self.daq.close_connections()
-        if not self.testing:
-            self.b0254.closeAll()
-            self.daq.close_relay1()
-            self.daq.close_relay2()
-
+   
     def initThreads(self):
        ## Initialize instruments and logging thread and process thread
        ## If testing, don't error out if failed to make connections
@@ -415,15 +403,33 @@ class MainControlWindow(qw.QMainWindow):
         # layout.addWidget(self.rxnTemp_grp,     5, 3,3,2)
         # layout.addWidget(self.rxnVac_grp,      8, 3,3,2)
 
+    def abortAll(self):
+        ## Stop all processes (except logging) and close all valves
+        ## any other safety things? change cryo?
+        self.purge_thread.running = False
+        self.dose_thread.running = False
+        self.currentProcessPlot_grp.group.setTitle("Process aborted")
+        #self.process_thread.running=False
+        # self.daq.close_connections()
+        if not self.testing:
+            self.b0254.closeAll()
+            self.daq.close_relay0()
+            self.daq.close_relay1()
+            self.daq.close_relay2()
+
     def closeEvent(self,event):
         if self.testing:
             print("trying to close gracefully")
-        
+        self.purge_thread.running = False
+        self.dose_thread.running = False
+        self.logging_thread.running = False
         self.logger.info(f'Closing serial connections and GUI window.')
         self.mks902._connection.close()
         self.mks925._connection.close()
-        self.b0254._connection.close()
-        self.ls335.disconnect_usb()
+        if self.b0254 != 'Brooks0254':
+            self.b0254._connection.close()
+        if self.ls335 != 'Model335':
+            self.ls335.disconnect_usb()
         self.daq.close_connections()
         event.accept()
 
@@ -438,6 +444,7 @@ class BoxedPlot(qw.QWidget):
         self.group = qw.QGroupBox(plot_title)
         self.plot = pg.PlotWidget()
         self.plot.getPlotItem().showGrid(x=True, y=True, alpha=1)
+        self.plot.getPlotItem().showAxis('right')
         if "qdarkstyle" in sys.modules:
             self.plot.setBackground((25, 35, 45))
         self.group.setLayout(layout)
@@ -477,6 +484,7 @@ class LoggingPlot(qw.QWidget):
         layout = qw.QVBoxLayout()
         self.group = qw.QGroupBox(plot_title)
         self.plot = pg.PlotWidget()
+        self.plot.getPlotItem().showAxis('right')
         # self.trace = pg.PlotCurveItem(pen=self.pen)
         self.trace = pg.PlotDataItem(pen=self.pen,symbol='o',symbolBrush=self.brush) ## trying this to have points and lines
         self.plot.addItem(self.trace)
