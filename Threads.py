@@ -67,8 +67,10 @@ class LoggingThread(QtCore.QThread):
             if self.testing:
                 rng = np.random.default_rng()
                 try:
-                    print("logging")
-                    self.new_cryo_pressure_data.emit(self.cryoPressure.get_pressure())
+                    
+                    cryo_pressure = self.cryoPressure.get_pressure()
+                    # print(cryo_pressure)
+                    self.new_cryo_pressure_data.emit(cryo_pressure)
                     self.new_rxn_pressure_data.emit(self.rxnPressure.get_pressure())
                     log_dict = {
                         'Time':strftime('%H%M%S'),
@@ -76,20 +78,25 @@ class LoggingThread(QtCore.QThread):
                         'Cryo Pressure':self.cryoPressure.get_pressure(),
                         }
                     if self.cryoControl != 'Model335':
-                        print("testing cry log")
+                        # print("testing cryo log")
                         cryo_temp = float(self.cryoControl.query('KRDG? A',check_errors=False))
                         rxn_temp = float(self.cryoControl.query("KRDG? B", check_errors=False))
                         self.new_cryo_temp_data.emit(cryo_temp)
                         self.new_rxn_temp_data.emit(rxn_temp)
                         log_dict['Cryo Temperature'] = cryo_temp
                         log_dict['Reaction Temperature'] = rxn_temp
+                    elif self.cryoControl == 'Model335':
+                        ## because pressure and temperature share x axis, wonder if this needs data to udpate
+                        self.new_cryo_temp_data.emit(0.0)
+                        self.new_rxn_temp_data.emit(0.0)
                     if self.b0254 != 'Brooks0254':
-                        print("testing MFC")
+                        # print("testing MFC log")
                         Ar_sccm, tot, time = self.b0254.MFC2.get_measured_values()
                         log_dict['Ar sccm'] = Ar_sccm
                         H2S_sccm, tot, time = self.b0254.MFC1.get_measured_values()
                         log_dict['H2S sccm'] = H2S_sccm
                         self.new_flow_data.emit((Ar_sccm,H2S_sccm))
+                        # print(f'New flow data:{Ar_sccm,H2S_sccm}')
                     with open(self.log_path,'a',newline='') as csvfile:
                         w = csv.DictWriter(csvfile, log_dict.keys())
                         if row == 0:
@@ -99,7 +106,7 @@ class LoggingThread(QtCore.QThread):
                                     # quotechar='|', quoting=csv.QUOTE_MINIMAL)
                         row +=1 
                 except (OSError,AttributeError) as e:
-                    print("error")
+                    print("logging error")
                     self.logger.exception(e)
                     self.new_rxn_temp_data.emit(200+rng.random())
                     self.new_cryo_temp_data.emit(170+rng.random())

@@ -222,7 +222,7 @@ if __name__ == "__main__":
     # print(ser.readline().decode())
     # time.sleep(10)
     # ser.write(b'@254TST!OFF;FF')
-    ser.write(b'@254PR1?;FF')
+    ser.write(b'@254GT!ARGON;FF')
     
     for n in range(3):
         rsp = ser.readline()
