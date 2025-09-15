@@ -17,7 +17,7 @@ from lakeshore import Model335
 my_instrument = Model335(baud_rate=57600)
 [A,B]=my_instrument.get_all_kelvin_reading()
 print(f"Read A = {A} K and B = {B} K")
-print(my_instrument.get_celsius_reading("A"))
+# print(my_instrument.get_celsius_reading("A"))
 
 ### testing 6/13/2025: niether version is working, COM6 isn't showing up in device manager
 ### testing 6/16/2025: lakeshore's Model335 package worked on my surface, just had to change baud rate in device manager
