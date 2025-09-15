@@ -222,13 +222,14 @@ if __name__ == "__main__":
     # print(ser.readline().decode())
     # time.sleep(10)
     # ser.write(b'@254TST!OFF;FF')
-    ser.write(b'@254FD!ALL;FF')
+    ser.write(b'@254GT!ARGON;FF')
     
     for n in range(3):
         rsp = ser.readline()
         print(rsp)
         print(rsp.decode())
 
+    print(ser.query(b'@254PR1?;FF'))
     ser.close()
  ## on 3/6/25 the above returned 
     #     COM3 is open...

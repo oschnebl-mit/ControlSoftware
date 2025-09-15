@@ -1,37 +1,86 @@
 import re,pyvisa
 import nidaqmx
-from lakeshore import Model335
+# from lakeshore import Model335
 import numpy as np
 import time, serial
 from threading import Lock
 
 class DAQ():
     '''Class for communicating with ni daq that controls relays'''
-    def __init__(self, logger):
+    def __init__(self, testing, logger):
         self.logger = logger
-        
+        self.testing = testing
         ## use nidaqmx Task() to create digital output channels (on/off relays)
-        self.relay1 = nidaqmx.Task()
-        self.relay1.do_channels.add_do_chan("Dev1/port0/line0")
-        self.relay2 = nidaqmx.Task()
-        self.relay2.do_channels.add_do_chan("Dev1/port0/line1")
-        logger.info('Initialized relays at "Dev1/port0/line0" and "Dev1/port0/line1"')
+        if self.testing:
+            try:
+                self.relay0 = nidaqmx.Task()
+                self.relay0.do_channels.add_do_chan("Dev1/port0/line0")
+                self.relay1 = nidaqmx.Task()
+                self.relay1.do_channels.add_do_chan("Dev1/port0/line1")
+                self.relay2 = nidaqmx.Task()
+                self.relay2.do_channels.add_do_chan("Dev1/port0/line2")
+                logger.info('Initialized relays at "Dev1/port0/line1" and "Dev1/port0/line2"')
+                self.virtual = False
+            except:
+                self.virtual = True
+                logger.info('Failed to initialize DAQ relays')
+        else:
+            self.virtual = False
+            self.relay0 = nidaqmx.Task()
+            self.relay0.do_channels.add_do_chan("Dev1/port0/line0")
+            self.relay1 = nidaqmx.Task()
+            self.relay1.do_channels.add_do_chan("Dev1/port0/line1")
+            self.relay2 = nidaqmx.Task()
+            self.relay2.do_channels.add_do_chan("Dev1/port0/line2")
+            logger.info('Initialized relays at "Dev1/port0/line0", "Dev1/port0/line1", and "Dev1/port0/line2"')
+
+    def open_relay0(self):
+        self.logger.info('Write True at relay 0 to open')
+        if not self.virtual:
+            self.relay0.write(True)
+            
+    def close_relay0(self):
+        self.logger.info('Write False at relay 0 to close')
+        if not self.virtual:
+            self.relay0.write(False)
 
     def open_relay1(self):
         self.logger.info('Write True at relay 1 to open')
-        self.relay1.write(True)
+        if not self.virtual:
+            self.relay1.write(True)
+        
     
     def close_relay1(self):
         self.logger.info('Write False at relay 1 to close')
-        self.relay1.write(False)
+        if not self.virtual:
+            self.relay1.write(False)
+
 
     def open_relay2(self):
         self.logger.info('Write True at relay 2 to open')
-        self.relay2.write(True)
+        if not self.virtual:
+            self.relay2.write(True)        
     
     def close_relay2(self):
         self.logger.info('Write False at relay 2 to close')
-        self.relay2.write(False)
+        if not self.virtual:
+            self.relay2.write(False)
+
+    def test_relay1(self):
+        print("Testing relay 1")
+        self.open_relay1()
+        time.sleep(5)
+        self.close_relay1()
+
+    def close_connections(self):
+        ## closes tasks so resources can be re-allocated
+        if not self.virtual:
+            self.relay0.close()
+            self.relay1.close()
+            self.relay2.close()
+        if self.testing:
+            print("closing nidaqmx tasks")
+
 
 ''' Lakeshore docs on this specific model's python driver: https://lake-shore-python-driver.readthedocs.io/en/latest/model_335.html
 The sensors we have: 1x Curve Matched Silicon Diode sensor @ cooler tip (LS-DT-670B-SD)
@@ -69,17 +118,27 @@ class PressureGauge:
     Object that holds the serial communication for a pressure gauge
     '''
 
-    def __init__(self, logger,com_port,deviceAddress='254'):
+    def __init__(self,testing,logger,com_port,deviceAddress='254'):
         '''com_port (e.g. 'COM3') and device Address is string of 3 ints
         '''
-        # self._connection: pyvisa = pyvisa.ResourceManager().open_resource(instrument) # read/write terminations?
-        self._connection = serial.Serial(port=com_port,baudrate=9600,parity=serial.PARITY_NONE,bytesize=8,stopbits=serial.STOPBITS_ONE,timeout=1)
-        self._address: str = deviceAddress
+        self.testing = testing
         self.logger = logger
-        self.com_lock = Lock()
-        # if self._address == None:
-        #     newaddress = self._ask_address()
-        #     self._address = newaddress[6:8] ## might need to decode or string-ify
+        if not self.testing:
+            self._connection = serial.Serial(port=com_port,baudrate=9600,parity=serial.PARITY_NONE,bytesize=8,stopbits=serial.STOPBITS_ONE,timeout=1)
+            self._address: str = deviceAddress
+            self.logger = logger
+            self.com_lock = Lock()
+            self.virtual = False
+        elif self.testing:
+            try:
+                self._connection = serial.Serial(port=com_port,baudrate=9600,parity=serial.PARITY_NONE,bytesize=8,stopbits=serial.STOPBITS_ONE,timeout=1)
+                self._address: str = deviceAddress
+                self.logger = logger
+                self.com_lock = Lock()
+                self.virtual = False
+            except:
+                self.virtual = True
+
 
     def _ask_address(self):
         ''' function to get address of specific pressure gauge. 254 addresses all devices on port.
@@ -119,7 +178,7 @@ class PressureGauge:
                 self._connection.write(command.encode('utf-8'))
                 # response = self._connection.read_bytes(15)
                 response = self._connection.readline()
-                print(f'PR{i} = {response}')
+                # print(f'PR{i} = {response}')
 
     def get_pressure(self):
         '''NOTE: PR1 - PR4 exist, but seems like PR1-PR3 are the same, PR4 is scientific notation'''
@@ -127,9 +186,9 @@ class PressureGauge:
         response = self.query(command).decode()
         if re.search('\\d*ACK',response) is not None:
             list = re.split('ACK|;',response)
-            print(list)
+            # print(list)
             value = list[1]
-            print(value)
+            # print(value)
             return float(value)
         else:
             self.logger.warning(f'Failed to receive pressure reading... Received {response}')
@@ -154,31 +213,97 @@ class PressureGauge:
 class Brooks0254:
     '''Object that holds the pyvisa connection to Brooks0254 MFC controller and handles communication with it'''
 
-    def __init__(self, logger, instrument, deviceAddress='29751'):
+    MEASUREMENT_UNITS = dict({
+        "ml": 0,
+        "mls": 1,
+        "mln": 2,
+        "l": 3,
+        "ls": 4,
+        "ln": 5,
+        "cm^3": 6,
+        "cm^3s": 7,
+        "cm^3n": 8,
+        "m^3": 9,
+        "m^3s": 10,
+        "m^3n": 11,
+        "g": 12,
+        "lb": 13,
+        "kg": 14,
+        "ft^3": 15,
+        "ft^3s": 16,
+        "ft^3n": 17,
+        "scc": 18,
+        "sl": 19,
+        "bar": 20,
+        "mbar": 21,
+        "psi": 22,
+        "kPa": 23,
+        "Torr": 24,
+        "atm": 25,
+        "Volt": 26,
+        "mA": 27,
+        "oC": 28,
+        "oK": 29,
+        "oR": 30,
+        "oF": 31,
+        "g/cc": 32,
+        "sg": 33,
+        "%": 34,
+        "lb/in^3": 35,
+        "lb/ft^3": 36,
+        "lb/gal": 37,
+        "kg/m^3": 38,
+        "g/ml": 39,
+        "kg/l": 40,
+        "g/l": 41
+    })
+
+    # Base time units
+    RATE_TIME_BASE = dict({
+        "sec": 1,
+        "min": 2,
+        "hrs": 3,
+        "day": 4
+    })
+
+    SP_FUNCTION = {
+        'rate': 1,
+        'batch': 2,
+        'blend': 3
+    }
+    
+    def __init__(self,testing, logger, instrument, deviceAddress='29751'):
         '''
         pyvisaConnection = pyvisa.ResourceManager().open_resource()
         MFCs: list of str naming the gases being controlled
         deviceAddress: str of len 5
+
+        As if July 2025, MFCs are installed, H2S is top, Ar is middle, H2 is bottom,
+        Let's call H2S = MFC1, Ar = MFC2, H2 = MFC3
         
         '''
-        self._connection = pyvisa.ResourceManager().open_resource(instrument)
-        self._address = deviceAddress
         self.logger = logger
-        
+        self.testing = testing
+        if self.testing:
+            try:
+                self._connection = pyvisa.ResourceManager().open_resource(instrument)
+                self._address = deviceAddress
+                self.virtual = False
+            except:
+                self.virtual = True
+                self.logger.info('Failed to initialize Brooks 0254')
+        else:
+            self._connection = pyvisa.ResourceManager().open_resource(instrument)
+            self._address = deviceAddress
+            self.virtual = False
 
-        self.MFC1 = MassFlowController(channel=1,pyvisaConnection=self._connection,deviceAddress=self._address)
-        self.MFC2 = MassFlowController(channel=2,pyvisaConnection=self._connection,deviceAddress=self._address)
-        self.MFC3 = MassFlowController(channel=3,pyvisaConnection=self._connection,deviceAddress=self._address)
+        self.MFC1 = MassFlowController(self.logger,channel=1,pyvisaConnection=self._connection,deviceAddress=self._address,virtual=self.virtual)
+        self.MFC2 = MassFlowController(self.logger,channel=2,pyvisaConnection=self._connection,deviceAddress=self._address,virtual=self.virtual)
+        self.MFC3 = MassFlowController(self.logger,channel=3,pyvisaConnection=self._connection,deviceAddress=self._address,virtual=self.virtual)
 
         self.MFC_list = [self.MFC1,self.MFC2, self.MFC3]
 
-        # for n, MFC in enumerate(self.MFC_list,start=1):
-        #     MFC.setup_MFC()
-    
-    def setupMFCs(self,gf):
-        '''Currently just sets the gas factor to a value from the parameter tree'''
-        for n, MFC in enumerate(self.MFC_list,start=1):
-            MFC.setup_MFC(gas_factor=gf[n-1],rate_units=18,time_base=2,decimal_point=1, SP_func = 1)
+
 
     def readValue(self):
         return 0
@@ -235,7 +360,7 @@ class MassFlowController:
         'PV_Full_Scale':'09'
     }
 
-    def __init__(self,channel,pyvisaConnection,deviceAddress=''):
+    def __init__(self,logger,channel,pyvisaConnection,deviceAddress='',virtual=False):
         '''
         Channel refers to each MFC (different gases)
         input for channel 1 = 1, output for channel 1 = 2
@@ -249,8 +374,11 @@ class MassFlowController:
         self._outputPort = 2 * channel
         self._address: str = deviceAddress  # this is a string because it needs to be zero-padded to be 5 chars long
         self.com_lock = Lock()
+        self.virtual = virtual
+        self.logger = logger
         # PyVisa connection
-        self._connection: pyvisa = pyvisaConnection
+        if not self.virtual:
+            self._connection: pyvisa = pyvisaConnection
 
 
     def setup_MFC(self,gas_factor=1,rate_units=18,time_base=2,decimal_point=1, SP_func = 1):
@@ -264,9 +392,9 @@ class MassFlowController:
         response = self.program_input_value('Measure_Units',rate_units)
         self.program_input_value('Time_Base',time_base)
         self.program_input_value('Decimal_Point',decimal_point)
-        self.program_input_value('Gas_Factor',gas_factor)
+        self.program_input_value('Gas_Factor',f'{gas_factor:0<5}') ## format gas factor so it always has 4 sig figs
 
-        print(response)
+        self.logger.info('Successfully programmed MFC input values, received following response', response)
 
 
     def get_measured_values(self):
@@ -276,12 +404,17 @@ class MassFlowController:
         Returns current process value, totalizer value, and datetime
         '''
         command = f'AZ{self._address}.{self._inputPort}K'
-        with self.com_lock:
-            response = self._connection.query(command).split(sep=',')
-        if response[2] == MassFlowController.TYPE_RESPONSE:
-            return np.float16(response[5]), np.float32(response[4]), time.time()
+        if self.virtual:
+            print(command)
         else:
-            return None
+            with self.com_lock:
+                response = self._connection.query(command).split(sep=',')
+            if response[2] == MassFlowController.TYPE_RESPONSE:
+                return np.float16(response[5]), np.float32(response[4]), time.time()
+            else:
+                self.logger.warning('Request for measured values returned something unexpected')
+                return None
+
 
     def clear_accumulated_value(self):
         ''' From manual: "allows any one channel input port accumulated value to be
@@ -290,9 +423,12 @@ class MassFlowController:
          Response should be None
          '''
         command = f'AZ{self._address}.{self._inputPort}Z1'
-        with self.com_lock:
-            response = self._connection.query(command).split(sep=',')
-        return response
+        if self.virtual:
+            print(command)
+        else:
+            with self.com_lock:
+                response = self._connection.query(command).split(sep=',')
+            return response
 
     '''
     Below are functions that program output values. The command structure is as follows:
@@ -323,25 +459,32 @@ class MassFlowController:
          Sends a program command to change the param (a str) to value (a float)
         '''
         if param not in self.Output_Program_Values:
-            return 'Error: not an output parameter'
+            self.logger.info('Error: not an output parameter')
         else:
             pcode = self.Output_Program_Values[param] # this is a string
             command = f'AZ{self._address}.{self._outputPort}P{pcode}={value}'
-            with self.com_lock:
-                response = self._connection.query(command).split(sep=',')
-            return response
+            if self.virtual:
+                print(command)
+            else:
+                with self.com_lock:
+                    response = self._connection.query(command).split(sep=',')
+                self.logger.info(f'Received response {response}')
+                return response
 
     def program_input_value(self,param,value):
         '''
          Sends a program command to change the param (a str) to value (a float)
         '''
         if param not in self.Input_Program_Values:
-            return 'Error: not an output parameter'
+            self.logger.info('Error: not an input parameter')
+            return None
         else:
             pcode = self.Input_Program_Values[param] # this is a 2 chr string
             command = f'AZ{self._address}.{self._inputPort}P{pcode}={value}'
+            self.logger.info(f'Sending command {command} to controller.')
             with self.com_lock:
                 response = self._connection.query(command).split(sep=',')
+            self.logger.info(f'Received response {response}')
             return response
 
     def read_programmed_value(self,param,value):
@@ -357,6 +500,12 @@ class MassFlowController:
             with self.com_lock:
                 response = self._connection.query(command).split(sep=',')
             return response
+
+    def set_sccm(self,rate):
+        self.logger.info(f'Setting MFC to {rate}')
+        self.program_output_value('SP_Function','1')
+        self.program_output_value('SP_Rate',rate)
+
         
     def start_batch(self,batch_volume,batch_rate):
         ### should com_lock wrap around all three program requests?

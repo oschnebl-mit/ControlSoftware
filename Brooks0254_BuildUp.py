@@ -1,6 +1,8 @@
 import pyvisa
 import numpy as np
-
+import time
+from datetime import datetime
+from threading import Lock
 ''' Defining Global Dictionary out here:'''
 Output_Program_Values = {
     'SP_Signal_Type':'00',
@@ -24,39 +26,40 @@ Input_Program_Values = {
 
 class Brooks0254:
 
-    def __init__(self, pyvisaConnection, deviceAddress=None):
+    def __init__(self, testing, pyvisaConnection, deviceAddress=None):
         '''
         pyvisaConnection = pyvisa.ResourceManager().open_resource()
         MFCs: list of str naming the gases being controlled
         deviceAddress: str of len 5
         
         '''
-        self.__connection = pyvisaConnection
+        self.testing = testing
+        if self.testing:
+            self.__connection = None
+        else:
+            self.__connection = pyvisaConnection
         self.__address = deviceAddress
+        
 
-        self.MFC1 = None
-        self.MFC2 = None
-        self.MFC3 = None
+        self.MFC1 = MassFlowController(testing=self.testing,channel=1,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
+        self.MFC2 = MassFlowController(testing=self.testing,channel=2,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
+        self.MFC3 = MassFlowController(testing=self.testing,channel=3,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
 
         self.MFC_list = []
 
-        self.MFC1 = MassFlowController(channel=1,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
+        # self.MFC1 = MassFlowController(channel=1,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
         # self.MFC1.setup_MFC()
 
-        for n in range(1,4):
-            try:
-                newMFC = MassFlowController(channel = n,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
-                self.MFC_list.append(newMFC)
-            except pyvisa.errors.VisaIOError as vioe:
-                print(f"Error while creating controller {n}: {vioe}")
+        # for n in range(1,4):
+        #     try:
+        #         newMFC = MassFlowController(channel = n,pyvisaConnection=pyvisaConnection,deviceAddress=self.__address)
+        #         self.MFC_list.append(newMFC)
+        #     except pyvisa.errors.VisaIOError as vioe:
+        #         print(f"Error while creating controller {n}: {vioe}")
 
-        for n, MFC in enumerate(self.MFC_list,start=1):
-            MFC.setup_MFC()
+        # for n, MFC in enumerate(self.MFC_list,start=1):
+        #     MFC.setup_MFC()
     
-    def setupMFCs(self,gf):
-        '''Currently just sets the gas factor to a value from the parameter tree'''
-        for n, MFC in enumerate(self.MFC_list,start=1):
-            MFC.setup_MFC(gas_factor=gf[n-1],rate_units=18,time_base=2,decimal_point=1, SP_func = 1)
 
     def readValue(self):
         return 0
@@ -172,7 +175,7 @@ class MassFlowController:
         'blend': 3
     }
 
-    def __init__(self,channel,pyvisaConnection,deviceAddress=''):
+    def __init__(self,testing, channel,pyvisaConnection,deviceAddress=''):
         '''
         Channel refers to each MFC (different gases)
         input for channel 1 = 1, output for channel 1 = 2
@@ -180,6 +183,7 @@ class MassFlowController:
         channels 3 and 4 follow the same pattern (odds in, evens out)
         channel 9 is global
         '''
+        self.testing = testing
         # Addressing parameters
         self.channel = channel
         self.__inputPort = 2 * channel - 1
@@ -187,7 +191,11 @@ class MassFlowController:
         self.__address: str = deviceAddress  # this is a string because it needs to be zero-padded to be 5 chars long
 
         # PyVisa connection
-        self.__connection: pyvisa = pyvisaConnection
+        if self.testing:
+            self.__connection = None
+        else:
+            self.__connection: pyvisa = pyvisaConnection
+        self.com_lock = Lock()
 
 
     def setup_MFC(self,gas_factor=1,rate_units=18,time_base=2,decimal_point=1, SP_func = 1):
@@ -201,9 +209,9 @@ class MassFlowController:
         response = self.program_input_value('Measure_Units',rate_units)
         self.program_input_value('Time_Base',time_base)
         self.program_input_value('Decimal_Point',decimal_point)
-        self.program_input_value('Gas_Factor',gas_factor)
+        self.program_input_value('Gas_Factor',f'{gas_factor:0<5}') ## format gas factor so it always has 4 sig figs
 
-        print(response)
+        self.logger.info('Successfully programmed MFC input values, received following response', response)
 
 
     def get_measured_values(self):
@@ -259,7 +267,9 @@ class MassFlowController:
             return 'Error: not an output parameter'
         else:
             pcode = Output_Program_Values[param] # this is a string
-            command = f'AZ{self.__address}.{self.__outputPort}P{pcode}={value}'
+            command = f'AZ{self.__address}.0{self.__outputPort}P{pcode}={value}'
+            if self.testing:
+                print(command)
             response = self.__connection.query(command).split(sep=',')
             return response
 
@@ -271,11 +281,16 @@ class MassFlowController:
             return 'Error: not an output parameter'
         else:
             pcode = Input_Program_Values[param] # this is a 2 chr string
-            command = f'AZ{self.__address}.{self.__inputPort}P{pcode}={value}'
-            response = self.__connection.query(command).split(sep=',')
-            return response
+            command = f'AZ{self.__address}.0{self.__inputPort}P{pcode}={value}'
+            if self.testing:
+                print(command)
+            try:
+                response = self.__connection.query(command).split(sep=',')
+                return response
+            except:
+                print('Failed to connect, no response')
 
-    def read_programmed_value(self,param,value):
+    def read_programmed_value(self,param):
         '''
          Reads the value of the given param (a str) 
          Value should be response[4]
@@ -287,6 +302,22 @@ class MassFlowController:
             command = f'AZ{self.__address}.{self.__outputPort}P{pcode}?'
             response = self.__connection.query(command).split(sep=',')
             return response
+        
+    def read_measured_values(self):
+        ''' Should get all input port values'''
+        command = f'AZ{self.__address}.{self.__inputPort}K'
+        response = self.__connection.query(command).split(sep=',')
+        return response
+    
+    def read_port_values(self,input=True):
+        ''' FROM MANUAL: This command enables terminal operator or host to acquire the present 
+        state of a channel output [or input] port programmed values.'''
+        if input:
+            command = f'AZ{self.__address}.{self.__inputPort}V'
+        else:
+            command = f'AZ{self.__address}.{self.__outputPort}V'
+        response = self.__connection.query(command).split(sep=',')
+        return response
         
     def start_batch(self,batch_volume,batch_rate):
         ## program SP function to batch, SP Rate to desired rate, SP Batch to desired quantity, then start batch
@@ -301,6 +332,29 @@ class MassFlowController:
         # 0 = Normal, 1 = Closed, 2 = Open
         response = self.program_output_value('SP_VOR',value)
 
+    def practice_batch(self,batch_volume,batch_rate):
+        ## want to test code
+        ### differs from start batch in that this function waits for "DONE" signal
+        ### competing thread would just ask for a measurement, so it would be fine to interleave
+        ## program SP function to batch, SP Rate to desired rate, SP Batch to desired quantity, then start batch
+        resp = self.program_output_value('SP_Function','2')
+        # print(resp)
+        self.program_output_value('SP_Batch',batch_volume)
+        self.program_output_value('SP_Rate',batch_rate)
+        command = f'AZ{self.__address}.{self.__inputPort}P00=007'
+        print(self.__connection.query(command))
+        # command = f'AZ{self.__address}.{self.__outputPort} F*' #start batch
+        # with self.com_lock:
+        #     self.__connection.write(command)
+        #     response = self.__connection.read()
+        #     print(response)
+            # while 'OK' in response:
+            #     command = f'AZ{self.__address}.{self.__inputPort} V' #check batch status
+            #     # self.__connection.write(command)
+            #     response = self.__connection.query(command)
+            #     print(response)
+                
+        # return response
 
 # t1 = TestController(1,deviceAddress=33533)
 # t2 = TestController(2)
@@ -310,5 +364,19 @@ class MassFlowController:
 
 if __name__ == "__main__":
     rm = pyvisa.ResourceManager()
-    brooks = rm.open_resource('ASRL4::INSTR',read_termination='\r',write_termination='\r')
-    brooks4channel = Brooks0254(brooks, deviceAddress='29751')
+    brooks = rm.open_resource('ASRL8::INSTR',read_termination='\r',write_termination='\r')
+    brooks4channel = Brooks0254(False, brooks, deviceAddress='29751')
+
+    # brooks4channel.MFC_list[1].practice_batch(1.0,0.1)
+    print(brooks4channel.MFC2.program_output_value('SP_Rate',4.0))
+    print(brooks4channel.MFC2.read_programmed_value('SP_Rate'))
+    time.sleep(10)
+    response = brooks4channel.MFC2.get_measured_values()
+    print(response)
+    time.sleep(10)
+    print(brooks4channel.MFC2.program_output_value('SP_Rate',0.0))
+    print(brooks4channel.MFC2.read_programmed_value('SP_Rate'))
+    time.sleep(10)
+    response = brooks4channel.MFC2.get_measured_values()
+    print(response)
+    

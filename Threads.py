@@ -1,22 +1,24 @@
-from time import time, sleep
+from time import time, sleep,strftime
 from PyQt5 import QtCore
 import numpy as np
+import csv
 # import pandas as pd
 
 class LoggingThread(QtCore.QThread):
     ''' Periodically asks for data from pressure gauge, furnace, and MFCS. Passes measured data and overpressure alarm to main window'''
     new_rxn_temp_data = QtCore.pyqtSignal(float)
     new_cryo_temp_data = QtCore.pyqtSignal(float)
-    # new_flow_data = QtCore.pyqtSignal(object) ## not sure how I'll handle gases yet
+    new_flow_data = QtCore.pyqtSignal(tuple) ## not sure how I'll handle gases yet
     new_rxn_pressure_data = QtCore.pyqtSignal(float)
     new_cryo_pressure_data = QtCore.pyqtSignal(float)
 
-    def __init__(self,logger,cryoControl, mfcControl, rxnGauge, cryoGauge,delay=30,testing = False):
+    def __init__(self,logger,cryoControl, mfcControl, rxnGauge, cryoGauge,save_csv,delay=30,testing = False):
         super().__init__()
         self.logger = logger
         # self.log_path = log_path
         self.testing = testing
         self.delay=delay
+        self.save_csv = save_csv
 
         if not self.testing:
             self.cryoControl = cryoControl
@@ -25,81 +27,123 @@ class LoggingThread(QtCore.QThread):
             self.mfcControl = mfcControl
 
         elif self.testing:
-            # try:
-            #     self.rxnPressure = rxnGauge
-            #     self.rxnPressure.test()
-            #     # self.rxnPressure.get_all_pressures()
-            #     pressure = self.rxnPressure.get_pressure()
-            #     self.new_rxn_pressure_data.emit(pressure)
-            #     print('successfully connected to MKS902 piezo, read pressure = ', pressure)
-            # except (OSError, AttributeError) as e:
-            #     self.logger.exception(e)
-            # try:
-            #     self.rxnPressure = cryoGauge
-            #     self.rxnPressure.test()
-            #     # self.rxnPressure.get_all_pressures()
-            #     pressure = self.rxnPressure.get_pressure()
-            #     self.new_rxn_pressure_data.emit(pressure)
-            #     print('successfully connected to MKS925 pirani, read pressure = ', pressure)
-            # except (OSError, AttributeError) as e:
-            #     self.logger.exception(e)
-            # try:
-            #     self.mfcControl = mfcControl
-            #     flow = self.mfcControl.MFC1.get_measured_values()
-                
-            #     print('successfully connected to Brooks0254, read values = ', flow)
-            # except (OSError,AttributeError) as e:
-            #     self.logger.exception(e)
-            
             try:
                 self.cryoControl = cryoControl
-                [cryo_temp,rxn_temp] = self.cryoControl.get_all_kelvin_reading()
-                self.new_cryo_temp_data.emit(cryo_temp)
-                print(f'Successfully connected to Lakeshore 335. Read temp {cryo_temp}')
+                cryo_temp = float(cryoControl.query('KRDG? A',check_errors=False))
+                # self.new_cryo_temp_data.emit(cryo_temp)
+                print(f'Successfully connected to Lakeshore 335, read temp {cryo_temp}')
             except (OSError,AttributeError) as e:
                 self.logger.exception(e)
+            try:
+                self.rxnPressure = rxnGauge
+                pressure = self.rxnPressure.get_pressure()
+                print('Successfully connected to MKS902 piezo, read pressure = ', pressure)
+            except (OSError, AttributeError) as e:
+                self.logger.exception(e)
+            try:
+                self.cryoPressure = cryoGauge
+                pressure = self.cryoPressure.get_pressure()
+                print('Successfully connected to MKS925 pirani, read pressure = ', pressure)
+            except (OSError, AttributeError) as e:
+                self.logger.exception(e)
 
-
+            try:
+                self.b0254 = mfcControl
+                sccm, tot, time = self.b0254.MFC2.get_measured_values()
+                print(f'Successfully connected to B0254, read MFC2 at {sccm} sccm')
+            except(OSError, AttributeError) as e:
+                self.logger.exception(e)
+                self.b0254 = 'Brooks0254'
+            
+            timestr = strftime('%Y%m%d-%H%M%S')
+            self.log_path = f'logs/CryoTest_{timestr}.csv'
+            
         self.running = False
 
     def run(self):
         self.running=True
+        row = 0
         while self.running:
             if self.testing:
                 rng = np.random.default_rng()
-                
-                # self.new_flow_data.emit(0)
-                self.new_rxn_pressure_data.emit(1*rng.random())
-                self.new_cryo_pressure_data.emit(0.1*rng.random())
-
                 try:
-                    # self.cryoControl = cryoControl
-                    [cryo_temp,rxn_temp] = self.cryoControl.get_all_kelvin_reading()
-                    self.new_cryo_temp_data.emit(cryo_temp)
-                    self.new_rxn_temp_data.emit(rxn_temp)
-                    # print(f'Successfully connected to Lakeshore 335. Read temp {cryo_temp}')
+                    
+                    cryo_pressure = self.cryoPressure.get_pressure()
+                    # print(cryo_pressure)
+                    self.new_cryo_pressure_data.emit(cryo_pressure)
+                    self.new_rxn_pressure_data.emit(self.rxnPressure.get_pressure())
+                    log_dict = {
+                        'Time':strftime('%H%M%S'),
+                        'Reaction Pressure':self.rxnPressure.get_pressure(),
+                        'Cryo Pressure':self.cryoPressure.get_pressure(),
+                        }
+                    if self.cryoControl != 'Model335':
+                        # print("testing cryo log")
+                        cryo_temp = float(self.cryoControl.query('KRDG? A',check_errors=False))
+                        rxn_temp = float(self.cryoControl.query("KRDG? B", check_errors=False))
+                        self.new_cryo_temp_data.emit(cryo_temp)
+                        self.new_rxn_temp_data.emit(rxn_temp)
+                        log_dict['Cryo Temperature'] = cryo_temp
+                        log_dict['Reaction Temperature'] = rxn_temp
+                    elif self.cryoControl == 'Model335':
+                        ## because pressure and temperature share x axis, wonder if this needs data to udpate
+                        self.new_cryo_temp_data.emit(0.0)
+                        self.new_rxn_temp_data.emit(0.0)
+                    if self.b0254 != 'Brooks0254':
+                        # print("testing MFC log")
+                        Ar_sccm, tot, time = self.b0254.MFC2.get_measured_values()
+                        log_dict['Ar sccm'] = Ar_sccm
+                        H2S_sccm, tot, time = self.b0254.MFC1.get_measured_values()
+                        log_dict['H2S sccm'] = H2S_sccm
+                        self.new_flow_data.emit((Ar_sccm,H2S_sccm))
+                        # print(f'New flow data:{Ar_sccm,H2S_sccm}')
+                    with open(self.log_path,'a',newline='') as csvfile:
+                        w = csv.DictWriter(csvfile, log_dict.keys())
+                        if row == 0:
+                            w.writeheader()
+                        w.writerow(log_dict)
+                        # writer = csv.writer(csvfile, delimiter=' ',
+                                    # quotechar='|', quoting=csv.QUOTE_MINIMAL)
+                        row +=1 
                 except (OSError,AttributeError) as e:
+                    print("logging error")
                     self.logger.exception(e)
                     self.new_rxn_temp_data.emit(200+rng.random())
                     self.new_cryo_temp_data.emit(170+rng.random())
-                    # print(f'logging cryo temp:{170+rng.random()}')
+                    self.new_rxn_pressure_data.emit(1*rng.random())
+                    self.new_cryo_pressure_data.emit(0.1*rng.random())
+                    self.new_flow_data.emit((1.0,0.0))
             else:
-                [cryo_temp, rxn_temp] = self.cryoControl.get_all_kelvin_reading()
+                self.new_cryo_pressure_data.emit(self.cryoPressure.get_pressure())
+                self.new_rxn_pressure_data.emit(self.rxnPressure.get_pressure())
                 log_dict = {
-                    'Reaction Pressure':self.rxnGauge.get_pressure(),
-                    'Cryo Pressure':self.cryoGauge.get_pressure(),
-                    'Reaction Temperature':rxn_temp,
-                    'Cryo Temperature':cryo_temp
-                }
-                self.new_rxn_pressure_data.emit(log_dict['Reaction Pressure'])
-                self.new_cryo_pressure_data.emit(log_dict['Cryo Pressure'])
-                self.new_cryo_temp_data.emit(cryo_temp)
-                self.new_rxn_temp_data.emit(rxn_temp)
+                    'Time':strftime('%H%M%S'),
+                    'Reaction Pressure':self.rxnPressure.get_pressure(),
+                    'Cryo Pressure':self.cryoPressure.get_pressure(),
+                    }
+                if self.cryoControl != 'Model335':
+                    cryo_temp = float(self.cryoControl.query('KRDG? A',check_errors=False))
+                    rxn_temp = float(self.cryoControl.query("KRDG? B", check_errors=False))
+                    self.new_cryo_temp_data.emit(cryo_temp)
+                    self.new_rxn_temp_data.emit(rxn_temp)
+                    log_dict['Cryo Temperature'] = cryo_temp
+                    log_dict['Reaction Temperature'] = rxn_temp
+                if self.b0254 != 'Brooks0254':
+                    Ar_sccm, tot, time = self.b0254.MFC2.get_measured_values()
+                    log_dict['Ar sccm'] = Ar_sccm
+                    H2S_sccm, tot, time = self.b0254.MFC1.get_measured_values()
+                    log_dict['H2S sccm'] = H2S_sccm
+                    self.new_flow_data.emit((Ar_sccm,H2S_sccm))
 
-                ## adding code to save measured values to a csv as well
-                # df = pd.DataFrame([log_dict])
-                # df.to_csv(self.log_path,mode='a' if self.log_path.exists() else 'w',header=not self.log_path.exists(),index=False)
-                ###
+                if self.save_csv:
+                    with open(self.log_path,'a',newline='') as csvfile:
+                            w = csv.DictWriter(csvfile, log_dict.keys())
+                            if row == 0:
+                                w.writeheader()
+                            w.writerow(log_dict)
+                            # writer = csv.writer(csvfile, delimiter=' ',
+                                        # quotechar='|', quoting=csv.QUOTE_MINIMAL)
+                            row +=1 
             QtCore.QThread.msleep(self.delay*1000)
 
 
@@ -120,11 +164,12 @@ class PurgeThread(QtCore.QThread):
         self.running = False
 
     
-    def setup(self,init_volume, init_rate, low_pressure, high_pressure, timeout = None, cycles = 3):
+    def setup(self,init_volume, init_rate, low_pressure, high_pressure, alarm_pressure, timeout = None, cycles = 3):
         self.volume = init_volume
         self.rate = init_rate
         self.low_pressure = low_pressure
         self.high_pressure = high_pressure
+        self.alarm_pressure = alarm_pressure
         self.timeout = timeout
         self.cycles = cycles
 
@@ -136,10 +181,10 @@ class PurgeThread(QtCore.QThread):
             self.timeout = self.volume/self.rate 
 
         if self.testing:
-            testing_message = f'Would run pump purge for {self.cycles} cycles with timeout of {self.timeout}'
+            testing_message = f'Would run pump/purge for {self.cycles} cycles with timeout of {self.timeout}'
             self.message.emit(testing_message)
             self.logger.info(testing_message)
-            print(testing_message)
+            # print(testing_message)
             for c in range(self.cycles):
                 if not self.running:  
                     break  
@@ -152,6 +197,7 @@ class PurgeThread(QtCore.QThread):
                 if not self.running:
                     break
                 ## pump first (assuming we start full of air)
+                self.DAQ.open_relay1()
                 self.DAQ.open_relay2()
                 message = f'On cycle {c+1}. Starting open to pump, waiting for {self.low_pressure} Torr'
                 self.logger.info(message)
@@ -159,15 +205,18 @@ class PurgeThread(QtCore.QThread):
                 self.wait_for_pressure(self.low_pressure,self.timeout)
                 self.DAQ.close_relay2()
                 ## purge with Ar second
-                self.DAQ.open_relay1()
-                self.MFC.MFC1.start_batch(self.volume, self.rate)
+                self.DAQ.open_relay0()
+                # self.MFC.MFC1.start_batch(self.volume, self.rate)
+                ## simple control means high pressure should be close but not too close to actual desired high
+                self.MFC.MFC2.set_sccm(self.rate)
                 message = f'On cycle {c+1}. Starting Ar purge at {self.rate}sccm for {self.volume}scc, waiting for {self.high_pressure} Torr'
                 self.logger.info(message)
                 self.message.emit(message)
-                self.wait_for_pressure(self.high_pressure, self.timeout)
-                self.DAQ.close_relay1()
+                self.wait_for_pressure(self.high_pressure,self.alarm_pressure, self.timeout)
+                self.MFC.MFC2.set_sccm(0)
+                self.DAQ.close_relay0()
 
-    def wait_for_pressure(self,pressure,timeout = None, delay = 10, tolerance = 5):
+    def wait_for_pressure(self,pressure,alarm_pressure=None,timeout = None, delay = 10, tolerance = 5):
         ''' wait until pressure within 5% of given pressure, checking at intervals of delay (s) '''
         self.waiting = True
         time = 0
@@ -176,15 +225,21 @@ class PurgeThread(QtCore.QThread):
                 break
             measured_pressure = self.PGauge.getPressure()
             self.new_pressure.emit(measured_pressure)
-            if timeout != None and timeout < time:
+            if measured_pressure >= alarm_pressure:
+                self.DAQ.close_relay0()
+                self.MFC.close_all()
+                self.running=False ## stop thread because something went wrong
+                break
+            elif timeout != None and timeout < time:
                 self.logger.error(f'Reached timeout waiting for pressure {pressure}')
+                # self.running=False
                 break ## this will allow the function to continue, which is good if it got close, bad if pressure gets too high
             elif 100*abs(measured_pressure - pressure)/pressure <= tolerance:
                 self.waiting = False
                 break
             else:
                 sleep(delay)
-                time += delay/60 # time in minutes, sleep in seconds
+                time += delay/60 # total time in min, delay is in seconds 
                 # QtCore.QThread.msleep(self.delay*1000)
 
 class DoseThread(QtCore.QThread):
@@ -204,14 +259,15 @@ class DoseThread(QtCore.QThread):
         self.DAQ = DAQ
         self.running = False
     
-    def setup(self,gas_name,init_volume, init_rate, target_pressure, timeout = None):
+    def setup(self,gas_name,init_volume, init_rate, target_pressure, alarm_pressure, timeout = None):
         self.volume = init_volume
         self.rate = init_rate
         self.pressure = target_pressure
+        self.alarm_pressure = alarm_pressure
         self.timeout = timeout
         self.gas_name = gas_name
         if not self.testing:
-            if self.gas_name == 'H2S':
+            if self.gas_name == 'Ar':
                 self.active_MFC = self.MFC.MFC2
             elif self.gas_name == 'H2':
                 self.active_MFC = self.MFC.MFC3
@@ -237,12 +293,14 @@ class DoseThread(QtCore.QThread):
                 sleep(2)
         else:
             message = f'Beginning {self.gas_name} dose of {self.volume} scc at {self.rate} sccm'
+            self.DAQ.open_relay0()
             self.DAQ.open_relay1()
-            self.active_MFC.start_batch(self.volume,self.rate)
+            self.active_MFC.set_sccm(self.rate)
             self.logger.info(message)
             self.message.emit(message)
             self.wait_for_pressure(self.pressure)
-            
+            self.active_MFC.set_sccm(0.0)
+            self.DAQ.close_relay0()
             self.DAQ.close_relay1()
     
 
@@ -253,9 +311,13 @@ class DoseThread(QtCore.QThread):
         while self.waiting:
             if not self.running:
                 break
-            measured_pressure = self.PGauge.getPressure()
-            measured_temperature = self.cryo.get_all_kelvin_reading()[1]
-            self.new_data.emit((measured_temperature,measured_pressure))
+            measured_pressure = self.PGauge.get_pressure()
+            self.new_data.emit(measured_pressure)
+            if measured_pressure >= self.alarm_pressure:
+                self.DAQ.close_relay1()
+                self.active_MFC.set_sccm(0)
+                self.running=False
+                break
             if timeout != None and timeout < time:
                 self.logger.error(f'Reached timeout waiting for pressure {pressure}')
                 break ## this will allow the function to continue, which is good if it got close, bad if pressure gets too high

@@ -11,22 +11,22 @@ class CtrlParamTree(ParameterTree):
             {'name':'MFC Setup Parameters', 'type':'group','children':[
                 {'name':'MFC 1 Setup Parameters', 'type':'group','children':[
                 {'name':'Gas Factor','type':'float','value':1.39},
-                {'name':'Rate Units','type':'int','value':18},
-                {'name':'Time Base','type':'list','limits':['sec','min','hrs','day']},
+                {'name':'Rate Units','type':'list','limits':['scc','ml']},
+                {'name':'Time Base','type':'list','limits':['min','hrs','sec','day']},
                 {'name':'Decimal Point','type':'int','value':1},
                 {'name':'SP Function','type':'list','limits':['RATE','BATCH']}
                 ]},
                 {'name':'MFC 2 Setup Parameters', 'type':'group','children':[
                 {'name':'Gas Factor','type':'float','value':1.0},
-                {'name':'Rate Units','type':'int','value':18},
-                {'name':'Time Base','type':'list','limits':['sec','min','hrs','day']},
+                {'name':'Rate Units','type':'list','limits':['scc','ml']},
+                {'name':'Time Base','type':'list','limits':['min','hrs','sec','day']},
                 {'name':'Decimal Point','type':'int','value':1},
                 {'name':'SP Function','type':'list','limits':['RATE','BATCH']}
                 ]},
                 {'name':'MFC 3 Setup Parameters', 'type':'group','children':[
                 {'name':'Gas Factor','type':'float','value':0.84},
-                {'name':'Rate Units','type':'int','value':18},
-                {'name':'Time Base','type':'list','limits':['sec','min','hrs','day']},
+                {'name':'Rate Units','type':'list','limits':['scc','ml']},
+                {'name':'Time Base','type':'list','limits':['min','hrs','sec','day']},
                 {'name':'Decimal Point','type':'int','value':1},
                 {'name':'SP Function','type':'list','limits':['RATE','BATCH']}
                 ]},
@@ -51,10 +51,10 @@ class CtrlParamTree(ParameterTree):
         self.p = Parameter.create(name='self.params',type='group',children=self.params)
         self.setParameters(self.p,showTop=False)
         
-        self.p.sigTreeStateChanged.connect(self.emitChange)
+    #     self.p.sigTreeStateChanged.connect(self.emitChange)
 
-    def emitChange(self,param,changes):
-        self.paramChange.emit(param,changes)
+    # def emitChange(self,param,changes):
+    #     self.dataChanged.emit(param,changes)
 
     def getMFCParamValue(self,mfc_no,child):
         # print(self.p.param('MFC Setup Parameters','MFC 3 Setup Parameters','Gas Factor').value())
@@ -82,7 +82,7 @@ class ProcessTree(ParameterTree):
                 {'name':'Timeout (min)','type':'int','value':1},
                 {'name':'Logging Interval (s)','type':'int','value':1}
          ]},
-            {'name':'Dose H2S','type':'group','children':[
+            {'name':'Dose Ar','type':'group','children':[
                 {'name':'Batch Volume','type':'float','value':1},
                 {'name':'Batch Rate','type':'float','value':1},
                 {'name':'Cut-off Pressure','type':'float','value':1}
@@ -91,13 +91,13 @@ class ProcessTree(ParameterTree):
                 {'name':'Batch Volume','type':'float','value':1},
                 {'name':'Batch Rate','type':'float','value':1},
                 {'name':'Cut-off Pressure','type':'float','value':1}
-        ]},
-            {'name':'Cryo Setpoint','type':'group','children':[
-                {'name':'Control Loop','type':'int','value':1},
-                {'name':'Ramp Enable','type':'bool','value':True},
-                {'name':'Ramp Rate (K/min)','type':'float','value':2},
-                {'name':'Setpoint (K)','type':'float','value':300}
-            ]}
+        ]}
+            # {'name':'Cryo Setpoint','type':'group','children':[
+            #     {'name':'Control Loop','type':'int','value':1},
+            #     {'name':'Ramp Enable','type':'bool','value':True},
+            #     {'name':'Ramp Rate (K/min)','type':'float','value':2},
+            #     {'name':'Setpoint (K)','type':'float','value':300}
+            # ]}
         ]
         self.p = Parameter.create(name='self.params',type='group',children=self.params)
         self.setParameters(self.p,showTop=False)
@@ -125,9 +125,29 @@ class ProcessTree(ParameterTree):
 
     def getH2SDoseValue(self,child):
         return self.p.param('Dose H2S',child).value()
+    
+    def getArDoseValue(self,child):
+        return self.p.param('Dose Ar',child).value()
 
     def getH2DoseValue(self,child):
         return self.p.param('Dose H2',child).value()
+
+
+
+class CryoTree(ParameterTree):
+
+    def __init__(self):
+        super().__init__()
+        self.params = [{'name':'Cryo Setpoint','type':'group','children':[
+                {'name':'Control Loop','type':'int','value':1},
+                {'name':'Ramp Enable','type':'bool','value':True},
+                {'name':'Ramp Rate (K/min)','type':'float','value':2},
+                {'name':'Setpoint (K)','type':'float','value':300},
+                {'name':'Heater Range','type':'list','limits':['Off','Low','Med','High']}
+            ]}
+        ]
+        self.p = Parameter.create(name='self.params',type='group',children=self.params)
+        self.setParameters(self.p,showTop=False)
     
     def getCryoValue(self,child):
         return self.p.param('Cryo Setpoint',child).value()

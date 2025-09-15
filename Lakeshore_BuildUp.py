@@ -10,6 +10,24 @@
 # print(lakeshore.read())
 # lakeshore.close()
 
+# import serial
+# ser = serial.Serial(
+#         port="COM6", baudrate = 57600,
+#         parity=serial.PARITY_ODD,
+#         bytesize=7,stopbits=serial.STOPBITS_ONE, timeout=1)
+# if ser.isOpen():
+#     print(ser.name + ' is open...')
+#         # for j in range(2):
+#         #     print(ser.readline())
+   
+# ser.write(b'*IDN?')
+    
+# for n in range(3):
+#     rsp = ser.readline()
+#     # print(rsp)
+#     print(rsp.decode())
+
+# ser.close()
 
 ## Easy Mode:
 from lakeshore import Model335
@@ -21,6 +39,7 @@ print(f"Read A = {A} K and B = {B} K")
 
 ### testing 6/13/2025: niether version is working, COM6 isn't showing up in device manager
 ### testing 6/16/2025: lakeshore's Model335 package worked on my surface, just had to change baud rate in device manager
+### testing 6/20/2025: errors in device manager went away with shorter usb cable
 """
 class TemperatureControl():
     '''
