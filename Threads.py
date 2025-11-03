@@ -73,7 +73,8 @@ class LoggingThread(QtCore.QThread):
                     self.new_cryo_pressure_data.emit(cryo_pressure)
                     self.new_rxn_pressure_data.emit(self.rxnPressure.get_pressure())
                     log_dict = {
-                        'Time':strftime('%H%M%S'),
+                        'Time':strftime('%H:%M:%S'),
+                        'DateTime':strftime('%Y%m%d-%H%M%S'),
                         'Reaction Pressure':self.rxnPressure.get_pressure(),
                         'Cryo Pressure':self.cryoPressure.get_pressure(),
                         }

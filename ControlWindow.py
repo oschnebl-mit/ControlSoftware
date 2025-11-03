@@ -14,6 +14,7 @@ from DummyPressureThread import DummyThread, NotAsDumbThread
 from Threads import LoggingThread, PurgeThread, DoseThread
 from Instruments import PressureGauge, DAQ, Brooks0254
 from lakeshore import Model335
+import lakeshore
 
 os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"]= "1"
 os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "1"
@@ -261,10 +262,17 @@ class MainControlWindow(qw.QMainWindow):
 
     def change_cryo(self):
         loop = self.cryoTree.getCryoValue('Control Loop')
-        ramp_enable = self.cryoTree.getCryoValue('Control Loop')
+        if self.cryoTree.getCryoValue('Ramp Enable'):
+            ramp_enable = 1
+        else:
+            ramp_enable = 0
         ramp_rate = self.cryoTree.getCryoValue('Ramp Rate (K/min)')
         setpoint = self.cryoTree.getCryoValue('Setpoint (K)')
-        self.ls335.set_setpoint_ramp_parameter(loop,ramp_enable,ramp_rate)
+        try:
+            self.ls335.set_setpoint_ramp_parameter(loop,ramp_enable,ramp_rate)
+        except lakeshore.generic_instrument.InstrumentException as ex:
+            self.logger.debug(f"Lakeshore error: {ex}")
+            print(f'Failed to change ramp parameter to enabled={ramp_enable}, rate={ramp_rate}')
         self.ls335.set_control_setpoint(loop, setpoint)
         self.logger.info(f'Setting cryostat loop {loop} to {setpoint} K at rate of {ramp_rate} K/min')
 
@@ -298,6 +306,7 @@ class MainControlWindow(qw.QMainWindow):
 
         self.cryoVac_plot.setXLink(self.cryoTemp_plot)
         self.rxnVac_plot.setXLink(self.rxnTemp_plot)
+        self.rxnTemp_plot.setXLink(self.cryoTemp_plot)
 
         # self.currentProcessPlot_grp = BoxedPlot('Current Process','#08F7FE')
         # self.currentProcessPlot = self.currentProcessPlot_grp.plot
