@@ -408,12 +408,17 @@ class MassFlowController:
             print(command)
         else:
             with self.com_lock:
-                response = self._connection.query(command).split(sep=',')
-            if response[2] == MassFlowController.TYPE_RESPONSE:
-                return np.float16(response[5]), np.float32(response[4]), time.time()
-            else:
-                self.logger.warning('Request for measured values returned something unexpected')
-                return None
+                try:
+                    response = self._connection.query(command).split(sep=',')
+                    if response[2] == MassFlowController.TYPE_RESPONSE:
+                        return np.float16(response[5]), np.float32(response[4]), time.time()
+                    else:
+                        self.logger.warning('Request for measured values returned something unexpected')
+                        return None
+                except pyvisa.errors.VisaIOError as e:
+                    print("Failed to retrieve measured values from MFC controller")
+                    self.logger.debug(f'Pyvisa error: {e}')
+                    return None
 
 
     def clear_accumulated_value(self):
@@ -442,8 +447,13 @@ class MassFlowController:
         '''sends the command to make the setpoint rate equal to value (float)'''
         command = f'AZ{self._address}.{self._outputPort}P01={value}'
         with self.com_lock:
-            response = self._connection.query(command).split(sep=',')
-        return response
+            try:
+                response = self._connection.query(command).split(sep=',')
+                return response
+            except pyvisa.errors.VisaIOError as e:
+                print("Failed to write SP rate to MFC controller")
+                self.logger.debug(f'Pyvisa error: {e}')
+                return None
 
     def write_SP_batch(self,value):
         '''sends command to make the batch setpoint equal to value (float)
@@ -466,10 +476,15 @@ class MassFlowController:
             if self.virtual:
                 print(command)
             else:
-                with self.com_lock:
-                    response = self._connection.query(command).split(sep=',')
-                self.logger.info(f'Received response {response}')
-                return response
+                try:
+                    with self.com_lock:
+                        response = self._connection.query(command).split(sep=',')
+                    self.logger.info(f'Received response {response}')
+                    return response
+                except pyvisa.errors.VisaIOError as e:
+                    # print('Failed to program output value')
+                    self.logger.warning(f'Received VisaIOError {e}')
+                    return None
 
     def program_input_value(self,param,value):
         '''
@@ -482,10 +497,15 @@ class MassFlowController:
             pcode = self.Input_Program_Values[param] # this is a 2 chr string
             command = f'AZ{self._address}.{self._inputPort}P{pcode}={value}'
             self.logger.info(f'Sending command {command} to controller.')
-            with self.com_lock:
-                response = self._connection.query(command).split(sep=',')
-            self.logger.info(f'Received response {response}')
-            return response
+            try:
+                with self.com_lock:
+                    response = self._connection.query(command).split(sep=',')
+                self.logger.info(f'Received response {response}')
+                return response
+            except pyvisa.errors.VisaIOError as e:
+                print('Failed to program input value')
+                self.logger.warning(f'Received VisaIOError {e}')
+                return None
 
     def read_programmed_value(self,param,value):
         '''
@@ -503,8 +523,12 @@ class MassFlowController:
 
     def set_sccm(self,rate):
         self.logger.info(f'Setting MFC to {rate}')
-        self.program_output_value('SP_Function','1')
-        self.program_output_value('SP_Rate',rate)
+        response = self.program_output_value('SP_Function','1')
+        if response == None:
+            print(f'Failed to program output value SP Function')
+        response = self.program_output_value('SP_Rate',rate)
+        if response == None:
+            print(f'Failed to program output value SP_Rate to rate {rate}')
 
         
     def start_batch(self,batch_volume,batch_rate):

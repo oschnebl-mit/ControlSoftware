@@ -47,9 +47,10 @@ class BoxedPlot(qw.QWidget):
             self.last_point.setData(x=[new_data[0]],y=[new_data[1]])
         
 class LoggingPlot(qw.QWidget):
-    def __init__(self, plot_title, color):
+    def __init__(self, plot_title, color, max_points):
         super().__init__()
         masterLayout = qw.QVBoxLayout()
+        self.num_points = max_points
         self.pen = pg.mkPen(color, width=1)
         self.brush = pg.mkBrush(color)
         layout = qw.QVBoxLayout()
@@ -80,5 +81,9 @@ class LoggingPlot(qw.QWidget):
             ydata = np.append(ydata,new_data)
         # print(f'Add to plot: ({xdata},{ydata})')
         self.trace.setData(x=xdata, y=ydata)
-        self.plot.getViewBox().autoRange()
+        if len(xdata)>self.num_points:
+            # print(len(xdata))
+            self.plot.setXRange(xdata[-self.num_points],xdata[-1])
+            # print(xdata[-1])
+        # self.plot.getViewBox().autoRange()
 

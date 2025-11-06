@@ -14,19 +14,20 @@ from DummyPressureThread import DummyThread, NotAsDumbThread
 from Threads import LoggingThread, PurgeThread, DoseThread
 from Instruments import PressureGauge, DAQ, Brooks0254
 from lakeshore import Model335
+import lakeshore
 
 os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"]= "1"
 os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "1"
 
 
 class MainControlWindow(qw.QMainWindow):
-    def __init__(self, logger, testing = False):
+    def __init__(self, logger, max_points,testing = False):
         ## Add log_path eventually
         super().__init__()
         self.testing = testing
         self.logger = logger
         self.setWindowTitle('Control Panel')
-
+        self.max_points = max_points
 
         self.resize(1280,720) # non-maximized state
         # self.resize(2560, 1440)  # for home monitor
@@ -261,10 +262,17 @@ class MainControlWindow(qw.QMainWindow):
 
     def change_cryo(self):
         loop = self.cryoTree.getCryoValue('Control Loop')
-        ramp_enable = self.cryoTree.getCryoValue('Control Loop')
+        if self.cryoTree.getCryoValue('Ramp Enable'):
+            ramp_enable = 1
+        else:
+            ramp_enable = 0
         ramp_rate = self.cryoTree.getCryoValue('Ramp Rate (K/min)')
         setpoint = self.cryoTree.getCryoValue('Setpoint (K)')
-        self.ls335.set_setpoint_ramp_parameter(loop,ramp_enable,ramp_rate)
+        try:
+            self.ls335.set_setpoint_ramp_parameter(loop,ramp_enable,ramp_rate)
+        except lakeshore.generic_instrument.InstrumentException as ex:
+            self.logger.debug(f"Lakeshore error: {ex}")
+            print(f'Failed to change ramp parameter to enabled={ramp_enable}, rate={ramp_rate}')
         self.ls335.set_control_setpoint(loop, setpoint)
         self.logger.info(f'Setting cryostat loop {loop} to {setpoint} K at rate of {ramp_rate} K/min')
 
@@ -280,10 +288,10 @@ class MainControlWindow(qw.QMainWindow):
         layout = qw.QGridLayout()  # All the widgets will be in a grid in the main box
         self.mainbox.setLayout(layout)  # set the layout
 
-        self.cryoTemp_grp = LoggingPlot('Cryo Temperature',"#FF035B")
-        self.cryoVac_grp = LoggingPlot('Cryo Vacuum','#08F7FE')
-        self.rxnVac_grp = LoggingPlot('Process Pressure','#08F7FE')
-        self.rxnTemp_grp = LoggingPlot('Process Temperature','#FF035B')
+        self.cryoTemp_grp = LoggingPlot('Cryo Temperature',"#FF035B",self.max_points)
+        self.cryoVac_grp = LoggingPlot('Cryo Vacuum','#08F7FE',self.max_points)
+        self.rxnVac_grp = LoggingPlot('Process Pressure','#08F7FE',self.max_points)
+        self.rxnTemp_grp = LoggingPlot('Process Temperature','#FF035B',self.max_points)
         self.cryoTemp_plot = self.cryoTemp_grp.plot
         self.cryoVac_plot = self.cryoVac_grp.plot
         self.rxnVac_plot = self.rxnVac_grp.plot
@@ -298,6 +306,7 @@ class MainControlWindow(qw.QMainWindow):
 
         self.cryoVac_plot.setXLink(self.cryoTemp_plot)
         self.rxnVac_plot.setXLink(self.rxnTemp_plot)
+        self.rxnTemp_plot.setXLink(self.cryoTemp_plot)
 
         # self.currentProcessPlot_grp = BoxedPlot('Current Process','#08F7FE')
         # self.currentProcessPlot = self.currentProcessPlot_grp.plot
@@ -307,11 +316,12 @@ class MainControlWindow(qw.QMainWindow):
         self.logInput = qw.QLineEdit('30')
         self.logInput.setValidator(QtGui.QIntValidator())
         ## TODO: write function to update interval when this value changes
-        self.logLabel = qw.QLabel('Logging Interval (sec):')
+        self.logLabel = qw.QLabel(' Interval (sec):')
         self.logButton = qw.QPushButton("Start Logging")
         self.logButton.setCheckable(True)
         # self.logButton.setChecked(False)
         self.abortButton = qw.QPushButton("Stop Process")
+        self.abortButton.setShortcut('Ctrl+Q')
 
         self.setArRateButton = qw.QPushButton("Set Ar sccm")
         self.ArRateInput = qw.QLineEdit("1.0")
@@ -387,6 +397,7 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.cryoTree,        8,0,3,2)
 
         ### Middle Column
+        layout.addWidget(self.abortButton,       0,1,1,1)
         layout.addWidget(self.ArRateInput,       1,1,1,1)
         layout.addWidget(self.setArRateButton,   1,2,1,1)
         layout.addWidget(self.H2SRateInput,      2,1,1,1)
@@ -410,14 +421,16 @@ class MainControlWindow(qw.QMainWindow):
         ## any other safety things? change cryo?
         self.purge_thread.running = False
         self.dose_thread.running = False
-        self.currentProcessPlot_grp.group.setTitle("Process aborted")
+        # self.currentProcessPlot_grp.group.setTitle("Process aborted")
         #self.process_thread.running=False
         # self.daq.close_connections()
-        if not self.testing:
-            self.b0254.closeAll()
-            self.daq.close_relay0()
-            self.daq.close_relay1()
-            self.daq.close_relay2()
+        if self.testing:
+            print('Aborting all')
+
+        self.b0254.closeAll()
+        self.daq.close_relay0()
+        self.daq.close_relay1()
+        self.daq.close_relay2()
 
     def closeEvent(self,event):
         if self.testing:
@@ -441,14 +454,17 @@ if __name__ == "__main__":
     # import pyvisa # if not demoMode
     timestr = t.strftime('%Y%m%d-%H%M%S')
     logger = logging.getLogger(__name__)
-    logging.basicConfig(filename=f'logs/CryoControlTest_{timestr}.log',level=logging.DEBUG)
+
+    log_file = os.path.join(os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs"), f"CryoControlTest_{timestr}.log")
+
+    logging.basicConfig(filename=log_file,level=logging.DEBUG)
     logger.addHandler(logging.NullHandler())
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
     font = QtGui.QFont()
     font.setPointSize(12)   # try 12–14 instead of default ~8–9
     app.setFont(font)
-    window = MainControlWindow(logger = logger, testing = True)
+    window = MainControlWindow(logger = logger,max_points=1000, testing = True)
     
     sys.exit(app.exec())
 
