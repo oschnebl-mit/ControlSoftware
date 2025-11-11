@@ -396,6 +396,7 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.cryoTree,        8,0,3,2)
 
         ### Middle Column
+        layout.addWidget(self.abortButton,       0,1,1,1)
         layout.addWidget(self.ArRateInput,       1,1,1,1)
         layout.addWidget(self.setArRateButton,   1,2,1,1)
         layout.addWidget(self.H2SRateInput,      2,1,1,1)
