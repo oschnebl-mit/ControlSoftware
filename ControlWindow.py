@@ -21,11 +21,12 @@ os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "1"
 
 
 class MainControlWindow(qw.QMainWindow):
-    def __init__(self, logger, max_points,testing = False):
+    def __init__(self, logger, csv_path, max_points,testing = False):
         ## Add log_path eventually
         super().__init__()
         self.testing = testing
         self.logger = logger
+        self.csv_path = csv_path
         self.setWindowTitle('Control Panel')
         self.max_points = max_points
 
@@ -58,6 +59,7 @@ class MainControlWindow(qw.QMainWindow):
     #     self.logging_thread.running = False
 
     def toggle_logging(self):
+        self.logging_thread.save_csv = self.save_csv.isChecked() ## now should be able to change the condition every time
         if self.logging_thread.running:
             self.logging_thread.running = False
             print('pause logging')
@@ -169,7 +171,7 @@ class MainControlWindow(qw.QMainWindow):
 
 
         
-        self.logging_thread = LoggingThread(self.logger,self.ls335,self.b0254,self.mks902,self.mks925,self.save_csv.isChecked(),self.logging_delay,self.testing) 
+        self.logging_thread = LoggingThread(self.logger,self.csv_path,self.ls335,self.b0254,self.mks902,self.mks925,self.save_csv.isChecked(),self.logging_delay,self.testing) 
         self.purge_thread = PurgeThread(self.testing, self.logger, self.b0254,self.mks925,self.daq)
         self.dose_thread = DoseThread(self.testing, self.logger, self.b0254,self.mks925,self.daq, self.ls335)
 
@@ -424,13 +426,16 @@ class MainControlWindow(qw.QMainWindow):
         # self.currentProcessPlot_grp.group.setTitle("Process aborted")
         #self.process_thread.running=False
         # self.daq.close_connections()
-        if self.testing:
-            print('Aborting all')
+        # if self.testing:
+        print('Aborting all')
 
         self.b0254.closeAll()
         self.daq.close_relay0()
         self.daq.close_relay1()
         self.daq.close_relay2()
+        self.testDAQ0Button.setChecked(self.daq.relay0.read())
+        self.testDAQ1Button.setChecked(self.daq.relay1.read())
+        self.testDAQ2Button.setChecked(self.daq.relay2.read())
 
     def closeEvent(self,event):
         if self.testing:
@@ -454,17 +459,16 @@ if __name__ == "__main__":
     # import pyvisa # if not demoMode
     timestr = t.strftime('%Y%m%d-%H%M%S')
     logger = logging.getLogger(__name__)
-
-    log_file = os.path.join(os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs"), f"CryoControlTest_{timestr}.log")
-
-    logging.basicConfig(filename=log_file,level=logging.DEBUG)
+    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+    log_file = os.path.join(log_path, f"CryoControlTest_{timestr}")
+    logging.basicConfig(filename=f"{log_file}.log",level=logging.DEBUG)
     logger.addHandler(logging.NullHandler())
     app = qw.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet())
     font = QtGui.QFont()
     font.setPointSize(12)   # try 12–14 instead of default ~8–9
     app.setFont(font)
-    window = MainControlWindow(logger = logger,max_points=1000, testing = True)
-    
+    window = MainControlWindow(logger = logger,csv_path=f"{log_path}.csv",max_points=120, testing = True)
+    # print("CWD is:", os.getcwd())
     sys.exit(app.exec())
 

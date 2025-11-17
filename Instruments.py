@@ -32,45 +32,58 @@ class DAQ():
             self.relay1.do_channels.add_do_chan("Dev1/port0/line1")
             self.relay2 = nidaqmx.Task()
             self.relay2.do_channels.add_do_chan("Dev1/port0/line2")
-            logger.info('Initialized relays at "Dev1/port0/line0", "Dev1/port0/line1", and "Dev1/port0/line2"')
+            self.scrollPurge = nidaqmx.Task()
+            self.scrollPurge.do_channels.add_do_chan("Dev1/port0/line3")
+            logger.info('Initialized relays at "Dev1/port0/line0", "Dev1/port0/line1", "Dev1/port0/line2, and Dev1/port0/line3"')
 
-    def open_relay0(self):
-        self.logger.info('Write True at relay 0 to open')
+    def open_valve0(self):
+        self.logger.info('Write True at relay 0 to open valve')
         if not self.virtual:
             self.relay0.write(True)
             
-    def close_relay0(self):
+    def close_valve0(self):
         self.logger.info('Write False at relay 0 to close')
         if not self.virtual:
             self.relay0.write(False)
 
-    def open_relay1(self):
+    def open_valve1(self):
         self.logger.info('Write True at relay 1 to open')
         if not self.virtual:
             self.relay1.write(True)
         
     
-    def close_relay1(self):
+    def close_valve1(self):
         self.logger.info('Write False at relay 1 to close')
         if not self.virtual:
             self.relay1.write(False)
 
 
-    def open_relay2(self):
+    def open_valve2(self):
         self.logger.info('Write True at relay 2 to open')
         if not self.virtual:
             self.relay2.write(True)        
     
-    def close_relay2(self):
+    def close_valve2(self):
         self.logger.info('Write False at relay 2 to close')
         if not self.virtual:
             self.relay2.write(False)
 
-    def test_relay1(self):
-        print("Testing relay 1")
-        self.open_relay1()
+    def test_valve1(self):
+        print("Testing valve 1")
+        self.open_valve1()
         time.sleep(5)
-        self.close_relay1()
+        self.close_valve1()
+
+    def open_scrollPurge(self):
+        self.logger.info('Write True at scrollPurge to open')
+        if not self.virtual:
+            self.scrollPurge.write(True)        
+    
+    def close_scrollPurge(self):
+        self.logger.info('Write False at scrollPurge to close')
+        if not self.virtual:
+            self.scrollPurge.write(False)
+
 
     def close_connections(self):
         ## closes tasks so resources can be re-allocated

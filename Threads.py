@@ -12,13 +12,14 @@ class LoggingThread(QtCore.QThread):
     new_rxn_pressure_data = QtCore.pyqtSignal(float)
     new_cryo_pressure_data = QtCore.pyqtSignal(float)
 
-    def __init__(self,logger,cryoControl, mfcControl, rxnGauge, cryoGauge,save_csv,delay=30,testing = False):
+    def __init__(self,logger,log_path,cryoControl, mfcControl, rxnGauge, cryoGauge,save_csv,delay=30,testing = False):
         super().__init__()
         self.logger = logger
-        # self.log_path = log_path
+        self.log_path = log_path
         self.testing = testing
         self.delay=delay
         self.save_csv = save_csv
+        # print(self.save_csv)
 
         if not self.testing:
             self.cryoControl = cryoControl
@@ -67,7 +68,6 @@ class LoggingThread(QtCore.QThread):
             if self.testing:
                 rng = np.random.default_rng()
                 try:
-                    
                     cryo_pressure = self.cryoPressure.get_pressure()
                     # print(cryo_pressure)
                     self.new_cryo_pressure_data.emit(cryo_pressure)
@@ -98,14 +98,16 @@ class LoggingThread(QtCore.QThread):
                         log_dict['H2S sccm'] = H2S_sccm
                         self.new_flow_data.emit((Ar_sccm,H2S_sccm))
                         # print(f'New flow data:{Ar_sccm,H2S_sccm}')
-                    with open(self.log_path,'a',newline='') as csvfile:
-                        w = csv.DictWriter(csvfile, log_dict.keys())
-                        if row == 0:
-                            w.writeheader()
-                        w.writerow(log_dict)
-                        # writer = csv.writer(csvfile, delimiter=' ',
-                                    # quotechar='|', quoting=csv.QUOTE_MINIMAL)
-                        row +=1 
+                    if self.save_csv:
+                        # print(f"try to save to csv at {self.log_path}")
+                        with open(self.log_path,'a',newline='') as csvfile:
+                            w = csv.DictWriter(csvfile, log_dict.keys())
+                            if row == 0:
+                                w.writeheader()
+                            w.writerow(log_dict)
+                            # writer = csv.writer(csvfile, delimiter=' ',
+                                        # quotechar='|', quoting=csv.QUOTE_MINIMAL)
+                            row +=1 
                 except (OSError,AttributeError) as e:
                     print("logging error")
                     self.logger.exception(e)
@@ -137,6 +139,7 @@ class LoggingThread(QtCore.QThread):
                     self.new_flow_data.emit((Ar_sccm,H2S_sccm))
 
                 if self.save_csv:
+                    # print(f"trying to write to csv at {self.log_path}")
                     with open(self.log_path,'a',newline='') as csvfile:
                             w = csv.DictWriter(csvfile, log_dict.keys())
                             if row == 0:
