@@ -31,7 +31,6 @@ class LoggingThread(QtCore.QThread):
             try:
                 self.cryoControl = cryoControl
                 cryo_temp = float(cryoControl.query('KRDG? A',check_errors=False))
-                # self.new_cryo_temp_data.emit(cryo_temp)
                 print(f'Successfully connected to Lakeshore 335, read temp {cryo_temp}')
             except (OSError,AttributeError) as e:
                 self.logger.exception(e)
@@ -69,7 +68,6 @@ class LoggingThread(QtCore.QThread):
                 rng = np.random.default_rng()
                 try:
                     cryo_pressure = self.cryoPressure.get_pressure()
-                    # print(cryo_pressure)
                     self.new_cryo_pressure_data.emit(cryo_pressure)
                     self.new_rxn_pressure_data.emit(self.rxnPressure.get_pressure())
                     log_dict = {
@@ -78,44 +76,48 @@ class LoggingThread(QtCore.QThread):
                         'Reaction Pressure':self.rxnPressure.get_pressure(),
                         'Cryo Pressure':self.cryoPressure.get_pressure(),
                         }
-                    if self.cryoControl != 'Model335':
-                        # print("testing cryo log")
+                except (OSError,AttributeError,TypeError) as e:
+                    print("failed to log pressure")
+                    self.logger.exception(e)
+                    self.new_cryo_pressure_data.emit(1*rng.random())
+                    self.new_rxn_pressure_data.emit(0.1*rng.random())
+                if self.cryoControl != 'Model335':
+                    try:
                         cryo_temp = float(self.cryoControl.query('KRDG? A',check_errors=False))
                         rxn_temp = float(self.cryoControl.query("KRDG? B", check_errors=False))
                         self.new_cryo_temp_data.emit(cryo_temp)
                         self.new_rxn_temp_data.emit(rxn_temp)
                         log_dict['Cryo Temperature'] = cryo_temp
                         log_dict['Reaction Temperature'] = rxn_temp
-                    elif self.cryoControl == 'Model335':
-                        ## because pressure and temperature share x axis, wonder if this needs data to udpate
-                        self.new_cryo_temp_data.emit(0.0)
-                        self.new_rxn_temp_data.emit(0.0)
-                    if self.b0254 != 'Brooks0254':
-                        # print("testing MFC log")
+                    except Exception as e:
+                        print("failed to log temperatures")
+                        self.new_cryo_temp_data.emit(170+rng.random())
+                        self.new_rxn_temp_data.emit(200+rng.random())
+
+                    # elif self.cryoControl == 'Model335':
+                    #     ## because pressure and temperature share x axis, wonder if this needs data to udpate
+                    #     self.new_cryo_temp_data.emit(0.0)
+                    #     self.new_rxn_temp_data.emit(0.0)
+                if self.b0254 != 'Brooks0254':
+                    try:
                         Ar_sccm, tot, time = self.b0254.MFC2.get_measured_values()
                         log_dict['Ar sccm'] = Ar_sccm
                         H2S_sccm, tot, time = self.b0254.MFC1.get_measured_values()
                         log_dict['H2S sccm'] = H2S_sccm
                         self.new_flow_data.emit((Ar_sccm,H2S_sccm))
-                        # print(f'New flow data:{Ar_sccm,H2S_sccm}')
-                    if self.save_csv:
-                        # print(f"try to save to csv at {self.log_path}")
-                        with open(self.log_path,'a',newline='') as csvfile:
-                            w = csv.DictWriter(csvfile, log_dict.keys())
-                            if row == 0:
-                                w.writeheader()
-                            w.writerow(log_dict)
-                            # writer = csv.writer(csvfile, delimiter=' ',
-                                        # quotechar='|', quoting=csv.QUOTE_MINIMAL)
-                            row +=1 
-                except (OSError,AttributeError) as e:
-                    print("logging error")
-                    self.logger.exception(e)
-                    self.new_rxn_temp_data.emit(200+rng.random())
-                    self.new_cryo_temp_data.emit(170+rng.random())
-                    self.new_rxn_pressure_data.emit(1*rng.random())
-                    self.new_cryo_pressure_data.emit(0.1*rng.random())
-                    self.new_flow_data.emit((1.0,0.0))
+                    except(OSError,AttributeError,TypeError) as e:
+                        print("failed to log flows")
+                        self.new_flow_data.emit((10*rng.random(),rng.random()))
+                   
+                if self.save_csv:
+                    # print(f"try to save to csv at {self.log_path}")
+                    with open(self.log_path,'a',newline='') as csvfile:
+                        w = csv.DictWriter(csvfile, log_dict.keys())
+                        if row == 0:
+                            w.writeheader()
+                        w.writerow(log_dict)
+                        row +=1 
+                
             else:
                 self.new_cryo_pressure_data.emit(self.cryoPressure.get_pressure())
                 self.new_rxn_pressure_data.emit(self.rxnPressure.get_pressure())
@@ -145,8 +147,6 @@ class LoggingThread(QtCore.QThread):
                             if row == 0:
                                 w.writeheader()
                             w.writerow(log_dict)
-                            # writer = csv.writer(csvfile, delimiter=' ',
-                                        # quotechar='|', quoting=csv.QUOTE_MINIMAL)
                             row +=1 
             QtCore.QThread.msleep(self.delay*1000)
 

@@ -431,7 +431,7 @@ class MassFlowController:
                 except pyvisa.errors.VisaIOError as e:
                     print("Failed to retrieve measured values from MFC controller")
                     self.logger.debug(f'Pyvisa error: {e}')
-                    return None
+                    return -1.0,-1.0,time.time()
 
 
     def clear_accumulated_value(self):
