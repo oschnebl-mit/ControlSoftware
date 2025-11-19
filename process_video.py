@@ -1,48 +1,12 @@
-# import pandas as pd
+## written 2025/10/13 mostly by chat GPT
+## some examples of ffmpeg commands (run in powershell) below, make sure everything is in the same folder obviously
 
-# # Load your CSV file
-# df = pd.read_csv(r"C:\Users\JaramilloGroup\Documents\Python\ControlSoftware\logs\CryoTest_20251009-112441.csv", sep=",")
-
-# # Convert DateTime strings to pandas Timestamps
-# df['datetime'] = pd.to_datetime(df['DateTime'], format="%Y%m%d-%H%M%S")
-
-# # Compute time (in seconds) since start
-# df['t_s'] = (df['datetime'] - df['datetime'].iloc[0]).dt.total_seconds()
-
-# # Adjust for video speedup
-# speed_factor = 200   # change this if needed
-# df['t_video'] = df['t_s'] / speed_factor
-
-# # Choose what you want to show — e.g., Cryo Temperature
-# with open("temp_overlay.txt", "w") as f:
-#     for _, row in df.iterrows():
-#         f.write(f"{row['t_video']:.3f} drawtext reinit text='Cryo {row['Cryo Temperature']:.1f} K'\n")
-
-# print("Wrote temp_overlay.txt")
-
+# .\ffmpeg.exe -ss 00:00:00 -to 05:09:30 -i "20251008.mp4" -filter:v "setpts=0.00167*PTS" -an "20251008_600x.mp4"
+# .\ffmpeg.exe -i "20251008_620x.mp4" -vf "subtitles=temp_overlay.ass" -codec:a copy "20251008_withTemp.mp4"
+# .\ffmpeg.exe -i "20251118_300x.mkv" -vf "subtitles=overlay.ass" -codec:a copy "20251118_300x_withTemp.mkv"
 
 # .\ffmpeg.exe -i "20251008.mp4" -vf "sendcmd=f=temp_overlay.txt, drawtext=reload=1:fontfile=/Windows/Fonts/arial.ttf:fontsize=36:fontcolor=white:x=20:y=20" -an "20251008_withTemp.mp4"
 # .\ffmpeg.exe -i "20251008_600x.mp4" -vf "sendcmd=f=temp_overlay.txt,drawtext=reload=1:fontfile=/Windows/Fonts/arial.ttf:fontsize=36:fontcolor=white:x=20:y=20" -codec:a copy "20251008_withTemp.mp4"
-
-# import pandas as pd
-
-# # Load your CSV (tab or comma delimited)
-# df = pd.read_csv(r"C:\Users\JaramilloGroup\Documents\Python\ControlSoftware\logs\CryoTest_20251009-112441.csv", sep=",")
-
-
-# df['datetime'] = pd.to_datetime(df['DateTime'], format="%Y%m%d-%H%M%S")
-# df['t_s'] = (df['datetime'] - df['datetime'].iloc[0]).dt.total_seconds()
-
-# # --- Adjust for video speed ---
-# speed_factor = 200  # change to your value
-# df['t_video'] = df['t_s'] / speed_factor
-
-# # --- Write FFmpeg command file ---
-# with open("temp_overlay.txt", "w", encoding="utf-8") as f:
-#     for _, row in df.iterrows():
-#         label = f"Cryo {row['Cryo Temperature']:.1f} K"
-#         safe_label = label.replace("'", r"\'")  # escape apostrophes if any
-#         f.write(f"{row['t_video']:.3f} [enter] drawtext reinit \"text='{safe_label}'\"\n")
 
 
 
@@ -52,7 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # ==== EDIT THESE FOR YOUR CASE ====
-CSV_PATH = Path(r"C:\Users\JaramilloGroup\Documents\Python\ControlSoftware\logs\CryoTest_20251016-084644.csv")  # your CSV file
+CSV_PATH = Path(r"C:\Users\JaramilloGroup\Documents\Python\ControlSoftware\logs\CryoTest_20251118-122712.csv")  # your CSV file
 DATETIME_COL = "DateTime"    # column with format: YYYYMMDD-HHMMSS (e.g., 20251009-112607)
 REACTION_T_COL = "Reaction Temperature"
 REACTION_P_COL = "Reaction Pressure"
@@ -62,10 +26,11 @@ REACTION_P_COL = "Reaction Pressure"
 BASE_DATETIME = None  # e.g., "2025-10-09 11:26:07" or None to auto-use first row
 
 # Your video is already sped up by this factor (e.g., 8 means 8x faster than real-time)
-SPEEDUP = 600
+SPEEDUP = 1/0.0033
 
-# Optional extra shift (seconds) to nudge all overlays forward/back on the video timeline.
-VIDEO_OFFSET_S = 0 # (50*60+50)-(46*60+44)
+# Optional extra shift (seconds) to nudge all overlays forward/back on the video timeline. 
+# Remember offset should be negative if csv starts before video
+VIDEO_OFFSET_S = ((27*60+12) - (1*60*60 + 52*60+26))/SPEEDUP # 13:52:26 video start, 12:27:12 csv start
 
 # Text formatting
 T_FMT = "{:.1f}"  # temperature formatting

@@ -67,31 +67,39 @@ class MainControlWindow(qw.QMainWindow):
             print('start logging')
             self.logging_thread.start()
 
-    def toggle_relay0(self):
+    def toggle_valve0(self):
         if self.daq.relay0.read():
-            self.logger.info('relay0 is open, closing relay')
-            self.daq.close_relay0()
+            self.logger.info('valve0 is open, closing valve')
+            self.daq.close_valve0()
 
         else:
-            self.logger.info('relay0 is closed, opening relay')
-            self.daq.open_relay0()
+            self.logger.info('valve0 is closed, opening valve')
+            self.daq.open_valve0()
 
-    def toggle_relay1(self):
+    def toggle_valve1(self):
         if self.daq.relay1.read():
-            self.logger.info('relay1 is open, closing relay')
-            self.daq.close_relay1()
+            self.logger.info('valve1 is open, closing valve')
+            self.daq.close_valve1()
 
         else:
-            self.logger.info('relay1 is closed, opening relay')
-            self.daq.open_relay1()
+            self.logger.info('valve1 is closed, opening valve')
+            self.daq.open_valve1()
 
-    def toggle_relay2(self):
+    def toggle_valve2(self):
         if self.daq.relay2.read():
-            self.logger.info('relay2 is open, closing relay')
-            self.daq.close_relay2()
+            self.logger.info('valve2 is open, closing valve')
+            self.daq.close_valve2()
         else:
-            self.logger.info('relay2 is closed, opening relay')
-            self.daq.open_relay2()
+            self.logger.info('valve2 is closed, opening valve')
+            self.daq.open_valve2()
+
+    def toggle_scrollPurge(self):
+        if self.daq.scrollPurge.read():
+            self.logger.info('scrollPurge valve is open, closing valve')
+            self.daq.close_scrollPurge()
+        else:
+            self.logger.info('scrollPurge valve is closed, opening valve')
+            self.daq.open_scrollPurge()
 
     def updateFlow(self,new_data):
         (Ar_sccm,H2S_sccm) = new_data
@@ -132,12 +140,14 @@ class MainControlWindow(qw.QMainWindow):
                 print("Failed to connect to Lakeshore cryo controller.")
             try:
                 self.daq = DAQ(self.testing,self.logger)
-                self.testDAQ0Button.clicked.connect(self.toggle_relay0)
-                self.testDAQ1Button.clicked.connect(self.toggle_relay1)
-                self.testDAQ2Button.clicked.connect(self.toggle_relay2)
+                self.testDAQ0Button.clicked.connect(self.toggle_valve0)
+                self.testDAQ1Button.clicked.connect(self.toggle_valve1)
+                self.testDAQ2Button.clicked.connect(self.toggle_valve2)
                 self.testDAQ0Button.setChecked(self.daq.relay0.read())
                 self.testDAQ1Button.setChecked(self.daq.relay1.read())
                 self.testDAQ2Button.setChecked(self.daq.relay2.read())
+                self.scrollPurgeButton.clicked.connect(self.toggle_scrollPurge)
+                self.scrollPurgeButton.setChecked(self.daq.scrollPurge.read())
             except:
                 self.daq = 'DAQ'
                 print("Failed to connect to DAQ")
@@ -156,10 +166,15 @@ class MainControlWindow(qw.QMainWindow):
                 self.mks925 = PressureGauge(self.testing,self.logger,'COM5')
 
                 self.daq = DAQ(self.testing,self.logger)
-                self.testDAQ0Button.clicked.connect(self.toggle_relay0)
-                self.testDAQ1Button.clicked.connect(self.toggle_relay1)
-                self.testDAQ2Button.clicked.connect(self.toggle_relay2)
-    
+                self.testDAQ0Button.clicked.connect(self.toggle_valve0)
+                self.testDAQ1Button.clicked.connect(self.toggle_valve1)
+                self.testDAQ2Button.clicked.connect(self.toggle_valve2)
+                self.scrollPurgeButton.clicked.connect(self.toggle_scrollPurge)
+                self.scrollPurgeButton.setChecked(self.daq.scrollPurge.read())
+                self.testDAQ0Button.setChecked(self.daq.relay0.read())
+                self.testDAQ1Button.setChecked(self.daq.relay1.read())
+                self.testDAQ2Button.setChecked(self.daq.relay2.read())
+
                 self.b0254 = Brooks0254(self.testing,self.logger, 'ASRL8::INSTR') ## 
                 self.setArRateButton.clicked.connect(self.setAr)
                 self.setH2SRateButton.clicked.connect(self.setH2S)
@@ -168,8 +183,6 @@ class MainControlWindow(qw.QMainWindow):
                 self.logger.exception(e)
                 print("Failed to connect to instrument")
                 self.close()
-
-
         
         self.logging_thread = LoggingThread(self.logger,self.csv_path,self.ls335,self.b0254,self.mks902,self.mks925,self.save_csv.isChecked(),self.logging_delay,self.testing) 
         self.purge_thread = PurgeThread(self.testing, self.logger, self.b0254,self.mks925,self.daq)
@@ -323,6 +336,7 @@ class MainControlWindow(qw.QMainWindow):
         self.logButton.setCheckable(True)
         # self.logButton.setChecked(False)
         self.abortButton = qw.QPushButton("Stop Process")
+        self.abortButton.setStyleSheet("background-color: #8B0000")
         self.abortButton.setShortcut('Ctrl+Q')
 
         self.setArRateButton = qw.QPushButton("Set Ar sccm")
@@ -358,12 +372,15 @@ class MainControlWindow(qw.QMainWindow):
         plotlayout.addWidget(self.cryoVac_grp)
         self.plotgroup.setLayout(plotlayout)
 
-        self.testDAQ0Button = qw.QPushButton("Toggle DAQ Relay 0")
+        self.testDAQ0Button = qw.QPushButton("Toggle DAQ Valve 0")
         self.testDAQ0Button.setCheckable(True)
-        self.testDAQ1Button = qw.QPushButton("Toggle DAQ Relay 1")
+        self.testDAQ1Button = qw.QPushButton("Toggle DAQ Valve 1")
         self.testDAQ1Button.setCheckable(True)
-        self.testDAQ2Button = qw.QPushButton("Toggle DAQ Relay 2")
+        self.testDAQ2Button = qw.QPushButton("Toggle DAQ Valve 2")
         self.testDAQ2Button.setCheckable(True)
+
+        self.scrollPurgeButton = qw.QPushButton("Toggle scrollVac Purge")
+        self.scrollPurgeButton.setCheckable(True)
 
         self.setCryoButton = qw.QPushButton("Change Cryo Setpoint")
         self.cryoTree = CryoTree()
@@ -405,6 +422,7 @@ class MainControlWindow(qw.QMainWindow):
         layout.addWidget(self.H2SRateInput,      2,1,1,1)
         layout.addWidget(self.setH2SRateButton,  2,2,1,1)
         layout.addWidget(self.flowBox,           3,1,2,2)
+        layout.addWidget(self.scrollPurgeButton, 5,1,1,1)
 
 
         
@@ -430,9 +448,9 @@ class MainControlWindow(qw.QMainWindow):
         print('Aborting all')
 
         self.b0254.closeAll()
-        self.daq.close_relay0()
-        self.daq.close_relay1()
-        self.daq.close_relay2()
+        self.daq.close_valve0()
+        self.daq.close_valve1()
+        self.daq.close_valve2()
         self.testDAQ0Button.setChecked(self.daq.relay0.read())
         self.testDAQ1Button.setChecked(self.daq.relay1.read())
         self.testDAQ2Button.setChecked(self.daq.relay2.read())
