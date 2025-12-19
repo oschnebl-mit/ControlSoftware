@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # ==== EDIT THESE FOR YOUR CASE ====
-CSV_PATH = Path(r"C:\Users\JaramilloGroup\Documents\Python\ControlSoftware\logs\CryoTest_20251118-122712.csv")  # your CSV file
+CSV_PATH = Path(r"C:\Users\JaramilloGroup\Documents\Python\ControlSoftware\logs\CryoTest_20251211-090846.csv")  # your CSV file
 DATETIME_COL = "DateTime"    # column with format: YYYYMMDD-HHMMSS (e.g., 20251009-112607)
 REACTION_T_COL = "Reaction Temperature"
 REACTION_P_COL = "Reaction Pressure"
@@ -26,11 +26,11 @@ REACTION_P_COL = "Reaction Pressure"
 BASE_DATETIME = None  # e.g., "2025-10-09 11:26:07" or None to auto-use first row
 
 # Your video is already sped up by this factor (e.g., 8 means 8x faster than real-time)
-SPEEDUP = 1/0.0033
+SPEEDUP = 500
 
 # Optional extra shift (seconds) to nudge all overlays forward/back on the video timeline. 
 # Remember offset should be negative if csv starts before video
-VIDEO_OFFSET_S = ((27*60+12) - (1*60*60 + 52*60+26))/SPEEDUP # 13:52:26 video start, 12:27:12 csv start
+VIDEO_OFFSET_S = ((8*60+46) - (1*60*60 + 29*60 + 36))/SPEEDUP # 10:29:36 video start, 9:08:46 csv start
 
 # Text formatting
 T_FMT = "{:.1f}"  # temperature formatting
