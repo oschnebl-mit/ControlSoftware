@@ -19,7 +19,9 @@ class DAQ():
                 self.relay1.do_channels.add_do_chan("Dev1/port0/line1")
                 self.relay2 = nidaqmx.Task()
                 self.relay2.do_channels.add_do_chan("Dev1/port0/line2")
-                logger.info('Initialized relays at "Dev1/port0/line1" and "Dev1/port0/line2"')
+                self.scrollPurge = nidaqmx.Task()
+                self.scrollPurge.do_channels.add_do_chan("Dev1/port0/line3")
+                logger.info('Initialized relays at "Dev1/port0/line0", "Dev1/port0/line1", "Dev1/port0/line2, and Dev1/port0/line3"')
                 self.virtual = False
             except:
                 self.virtual = True

@@ -2,7 +2,7 @@
 import nidaqmx, logging
 import time as t
 
-class DAQ():
+class DAQ0():
     '''Class for communicating with ni daq that controls relays'''
     def __init__(self, logger):
         # system = nidaqmx.system.System.local()
@@ -38,7 +38,7 @@ class DAQ():
         self.relay2.close()
         
 
-
+from Instruments import DAQ
 if __name__ == "__main__":
     # import pyvisa # if not demoMode
     timestr = t.strftime('%Y%m%d-%H%M%S')
@@ -46,8 +46,9 @@ if __name__ == "__main__":
     logging.basicConfig(filename=f'logs/CryoControlTest_{timestr}.log',level=logging.DEBUG)
     logger.addHandler(logging.NullHandler())
     
-    testdaq = DAQ(logger)
-    testdaq.open_relay1()
+    testdaq = DAQ(True,logger)
+    print("starting test")
+    testdaq.open_valve0()
     t.sleep(5)
-    testdaq.close_relay1()
+    testdaq.close_valve0()
     testdaq.close_connections()
