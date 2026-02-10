@@ -357,10 +357,10 @@ class MainControlWindow(qw.QMainWindow):
         flowLayout = qw.QGridLayout()
         flowgroup = qw.QGroupBox('Measured Flow')
         flowgroup.setLayout(flowLayout)
-        flowLayout.addWidget(self.Arflow,       0,0,1,1)
-        flowLayout.addWidget(self.H2Sflow,        1,0,1,1)
-        flowLayout.addWidget(self.Arflow_units, 0,1,1,1)
-        flowLayout.addWidget(self.H2Sflow_units,  1,1,1,1)
+        flowLayout.addWidget(self.Arflow,         1,0,1,1)
+        flowLayout.addWidget(self.H2Sflow,        0,0,1,1)
+        flowLayout.addWidget(self.Arflow_units,   1,1,1,1)
+        flowLayout.addWidget(self.H2Sflow_units,  0,1,1,1)
         masterLayoutflow.addWidget(flowgroup)
         self.flowBox.setLayout(masterLayoutflow)
 
@@ -417,10 +417,10 @@ class MainControlWindow(qw.QMainWindow):
 
         ### Middle Column
         layout.addWidget(self.abortButton,       0,1,1,1)
-        layout.addWidget(self.ArRateInput,       1,1,1,1)
-        layout.addWidget(self.setArRateButton,   1,2,1,1)
-        layout.addWidget(self.H2SRateInput,      2,1,1,1)
-        layout.addWidget(self.setH2SRateButton,  2,2,1,1)
+        layout.addWidget(self.H2SRateInput,      1,1,1,1)
+        layout.addWidget(self.setH2SRateButton,  1,2,1,1)
+        layout.addWidget(self.ArRateInput,       2,1,1,1)
+        layout.addWidget(self.setArRateButton,   2,2,1,1)
         layout.addWidget(self.flowBox,           3,1,2,2)
         layout.addWidget(self.scrollPurgeButton, 5,1,1,1)
 
